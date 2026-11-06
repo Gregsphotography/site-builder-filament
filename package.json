@@ -1,0 +1,16 @@
+{
+    "name": "@gregsphotography/site-builder-filament-development",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "node tools/build-assets.mjs",
+        "build:check": "node tools/build-assets.mjs --check",
+        "test": "node --test tests/*.test.mjs"
+    },
+    "devDependencies": {
+        "esbuild": "^0.25.0"
+    },
+    "imports": {
+        "#site-builder-core-protocol": "./vendor/gregsphotography/site-builder-core/resources/js/protocol.js"
+    }
+}

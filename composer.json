@@ -1,0 +1,74 @@
+{
+    "name": "gregsphotography/site-builder-filament",
+    "description": "Filament integration for the independent Laravel Site Builder.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.5",
+        "filament/filament": "^5.11",
+        "livewire/livewire": "^4.4.8",
+        "gregsphotography/site-builder-core": "0.3.0-rc.8"
+    },
+    "suggest": {
+        "gregsphotography/site-builder-components": "Optional standard blocks, themes, templates and local media."
+    },
+    "autoload": {
+        "psr-4": {
+            "SiteBuilder\\Filament\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "SiteBuilder\\Filament\\SiteBuilderFilamentServiceProvider"
+            ]
+        }
+    },
+    "archive": {
+        "exclude": [
+            "/tests",
+            "/tools",
+            "/vendor",
+            "/node_modules",
+            "/.github",
+            "/.phpunit.cache",
+            "/composer.lock",
+            "/package.json",
+            "/package-lock.json",
+            "/phpunit.xml",
+            "/.gitignore",
+            "/.gitattributes",
+            "/CONTRIBUTING.md"
+        ]
+    },
+    "conflict": {
+        "p2data/site-builder-filament": "*"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.24",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.0",
+        "phpunit/phpunit": "^12.5",
+        "gregsphotography/site-builder-components": "0.3.0-rc.8"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SiteBuilder\\Filament\\Tests\\": "tests/",
+            "SiteBuilder\\Core\\Tests\\": "tests/Support/Core/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "format:check": "pint --test"
+    },
+    "config": {
+        "allow-plugins": false,
+        "sort-packages": true,
+        "platform": {
+            "php": "8.5.0"
+        }
+    },
+    "support": {
+        "issues": "https://github.com/Gregsphotography/site-builder-filament/issues"
+    }
+}
