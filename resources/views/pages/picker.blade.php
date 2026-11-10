@@ -37,7 +37,12 @@
                             wire:key="picker-entry-{{ $entry['key'] }}-{{ $entry['version'] }}" x-show="pickerMatches($el.dataset)"
                             @click="run('reviewStartingPoint', @js($entry['key']), null)" :disabled="busy || queue.blocked || $wire.readOnly || @js(!$entry['insertable'])"
                             aria-pressed="{{ ($this->pickerReview['key'] ?? null) === $entry['key'] ? 'true' : 'false' }}">
-                            <span aria-hidden="true" class="sb-picker-symbol">▦</span><strong>{{ $entry['label'] }}</strong>
+                            <span class="sb-library-illustration sb-picker-illustration">
+                                @include('site-builder-filament::pages.component-illustration', [
+                                    'type' => $entry['kind'] === 'component' && str_starts_with($entry['id'], 'component:') ? substr($entry['id'], 10) : null,
+                                ])
+                            </span>
+                            <strong>{{ $entry['label'] }}</strong>
                             <span>{{ $entry['category'] }}{{ $entry['legacy'] ? ' · Legacy' : '' }}</span><small>{{ $entry['description'] }}</small>
                             @unless($entry['previewAvailable'])<small>Preview unavailable for this component</small>@endunless
                             @if($entry['variantDiagnostic'])<small>{{ $entry['variantDiagnostic'] }}</small>@endif
