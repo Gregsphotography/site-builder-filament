@@ -11,9 +11,10 @@ use SiteBuilder\Core\Installation\SetupAuthorization;
 use SiteBuilder\Core\Models\Page;
 use SiteBuilder\Core\Rendering\LocaleCatalog;
 use SiteBuilder\Filament\Contracts\BatchMediaPicker;
+use SiteBuilder\Filament\Contracts\TypedMediaPicker;
 use SiteBuilder\Filament\Forms\BatchMediaSelection;
 
-final readonly class ComponentMediaPicker implements BatchMediaPicker
+final readonly class ComponentMediaPicker implements BatchMediaPicker, TypedMediaPicker
 {
     public function __construct(private object $media) {}
 
@@ -27,6 +28,19 @@ final readonly class ComponentMediaPicker implements BatchMediaPicker
         }
 
         return $this->media->options($locale);
+    }
+
+    public function optionsForKind(string $locale, string $kind): array
+    {
+        if ($kind === 'image') {
+            return $this->options($locale);
+        }
+        $actor = Filament::getCurrentPanel() === null ? null : Filament::auth()->user();
+        if ($actor === null || ! (app(SetupAuthorization::class)->media($actor, 'view') ?? Gate::forUser($actor)->allows('viewAny', Page::class))) {
+            return [];
+        }
+
+        return $this->media->options($locale, $kind);
     }
 
     public function selectMany(Authenticatable $actor, string $locale, array $references): BatchMediaSelection

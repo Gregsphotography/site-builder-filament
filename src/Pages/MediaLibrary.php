@@ -28,6 +28,8 @@ final class MediaLibrary extends Page
 {
     protected static ?string $navigationLabel = 'Media library';
 
+    protected static ?string $title = 'Media library';
+
     protected string $view = 'site-builder-filament::pages.media-library';
 
     #[Locked]
@@ -50,7 +52,7 @@ final class MediaLibrary extends Page
     public function mount(): void
     {
         abort_unless(self::canAccess(), 403);
-        $this->form->fill(['locale' => app(LocaleCatalog::class)->default()]);
+        $this->form->fill(['kind' => 'image', 'locale' => app(LocaleCatalog::class)->default()]);
     }
 
     #[Unexposed]
@@ -59,12 +61,24 @@ final class MediaLibrary extends Page
         $locales = app(LocaleCatalog::class)->all();
 
         return $schema->components([
-            FileUpload::make('upload')->label('Image')->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'])->maxSize((int) config('site-builder-components.media.max_kilobytes', 10240))
+            Select::make('kind')->label('Media type')->options(['image' => 'Image', 'video' => 'Video (MP4 or WebM)', 'track' => 'Captions (WebVTT)'])->default('image')->required()->live()
+                ->afterStateUpdated(function (): void {
+                    $this->data['upload'] = null;
+                })
+                ->visible(fn (): bool => $this->selectedAsset === null),
+            FileUpload::make('upload')->key(fn (): string => 'upload-'.($this->data['kind'] ?? 'image'))->label('File')->acceptedFileTypes(fn (): array => match ($this->data['kind'] ?? 'image') {
+                'video' => ['video/mp4', 'video/webm'], 'track' => ['text/vtt', 'text/plain', 'application/octet-stream'], default => ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'],
+            })->maxSize(fn (): int => (int) config('site-builder-components.media.'.match ($this->data['kind'] ?? 'image') {
+                'video' => 'video_max_kilobytes', 'track' => 'track_max_kilobytes', default => 'max_kilobytes'
+            }, match ($this->data['kind'] ?? 'image') {
+                'video' => 102400, 'track' => 1024, default => 10240
+            }))
+                ->helperText(fn (): string => 'Maximum on this server: '.number_format((app(OptionalComponents::class)->media()->uploadReadiness($this->data['kind'] ?? 'image')['effective_kilobytes']) / 1024, 1).' MiB. Videos must already be browser-ready.')
                 ->storeFiles(false)->required(fn (): bool => $this->selectedAsset === null)->visible(fn (): bool => $this->selectedAsset === null),
             TextInput::make('name')->maxLength(255)->visible(fn (): bool => $this->selectedAsset === null),
             Select::make('locale')->label('Alternative text language')->options(array_combine($locales, $locales))->required()
-                ->live()->afterStateUpdated(fn (): mixed => $this->fillAssetAlt()),
-            TextInput::make('alt')->label('Alternative text')->maxLength(1000)->helperText('Describe the image in this language. Decorative use can be selected separately on a page.'),
+                ->live()->afterStateUpdated(fn (): mixed => $this->fillAssetAlt())->visible(fn (): bool => ($this->data['kind'] ?? 'image') === 'image'),
+            TextInput::make('alt')->label('Alternative text')->maxLength(1000)->helperText('Describe the image in this language. Decorative use can be selected separately on a page.')->visible(fn (): bool => ($this->data['kind'] ?? 'image') === 'image'),
         ])->statePath('data')->disabled(fn (): bool => ! $this->canManage());
     }
 
@@ -72,7 +86,7 @@ final class MediaLibrary extends Page
     {
         $this->authorizeManage();
         $data = $this->form->getState();
-        if (! app(LocaleCatalog::class)->has($data['locale'])) {
+        if (($data['kind'] ?? 'image') === 'image' && ! app(LocaleCatalog::class)->has($data['locale'] ?? '')) {
             throw ValidationException::withMessages(['data.locale' => 'Choose a configured language.']);
         }
         $media = app(OptionalComponents::class)->media();
@@ -84,20 +98,25 @@ final class MediaLibrary extends Page
             }
         } else {
             if (! ($data['upload'] ?? null) instanceof UploadedFile) {
-                throw ValidationException::withMessages(['data.upload' => 'Choose an image to upload.']);
+                throw ValidationException::withMessages(['data.upload' => 'Choose a file to upload.']);
             }
-            $media->store($data['upload'], [$data['locale'] => $data['alt'] ?? ''], $data['name'] ?: null);
+            match ($data['kind'] ?? 'image') {
+                'image' => $media->store($data['upload'], [$data['locale'] => $data['alt'] ?? ''], $data['name'] ?: null),
+                'video' => $media->storeVideo($data['upload'], $data['name'] ?: null),
+                'track' => $media->storeTrack($data['upload'], $data['name'] ?: null),
+                default => throw ValidationException::withMessages(['data.kind' => 'Choose an available media type.']),
+            };
         }
         $this->selectedAsset = null;
         $this->assetVersion = 0;
-        $this->form->fill(['locale' => app(LocaleCatalog::class)->default()]);
+        $this->form->fill(['kind' => 'image', 'locale' => app(LocaleCatalog::class)->default()]);
         Notification::make()->title('Media saved')->success()->send();
     }
 
     public function editAsset(string $id): void
     {
         $this->authorizeManage('update');
-        $asset = app(OptionalComponents::class)->media()->entries()->firstWhere('id', $id) ?? abort(404);
+        $asset = app(OptionalComponents::class)->media()->entries('all')->firstWhere('id', $id) ?? abort(404);
         $this->selectedAsset = (string) $asset->id;
         $this->assetVersion = (int) $asset->write_version;
         $locale = app(LocaleCatalog::class)->default();
@@ -109,7 +128,7 @@ final class MediaLibrary extends Page
         $this->authorizeManage('upload');
         $this->selectedAsset = null;
         $this->assetVersion = 0;
-        $this->form->fill(['locale' => app(LocaleCatalog::class)->default()]);
+        $this->form->fill(['kind' => 'image', 'locale' => app(LocaleCatalog::class)->default()]);
     }
 
     #[Unexposed]
@@ -117,9 +136,10 @@ final class MediaLibrary extends Page
     {
         abort_unless(self::canAccess(), 403);
 
-        return app(OptionalComponents::class)->media()->entries()->map(fn ($asset): array => [
+        return app(OptionalComponents::class)->media()->entries('all')->map(fn ($asset): array => [
             'id' => (string) $asset->id, 'name' => $asset->name, 'url' => Storage::disk($asset->disk)->url($asset->path),
             'width' => $asset->width, 'height' => $asset->height, 'alt' => $asset->alt[app(LocaleCatalog::class)->default()] ?? '',
+            'mime' => $asset->mime, 'kind' => str_starts_with($asset->mime, 'image/') ? 'image' : (str_starts_with($asset->mime, 'video/') ? 'video' : 'track'),
         ])->all();
     }
 
@@ -149,7 +169,7 @@ final class MediaLibrary extends Page
             return;
         }
         $this->authorizeManage();
-        $asset = app(OptionalComponents::class)->media()->entries()->firstWhere('id', $this->selectedAsset) ?? abort(404);
+        $asset = app(OptionalComponents::class)->media()->entries('all')->firstWhere('id', $this->selectedAsset) ?? abort(404);
         $locale = $this->data['locale'] ?? '';
         $this->data['alt'] = app(LocaleCatalog::class)->has($locale) ? ($asset->alt[$locale] ?? '') : '';
     }

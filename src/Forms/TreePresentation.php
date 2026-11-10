@@ -61,6 +61,8 @@ final readonly class TreePresentation
                     'canMoveIn' => $selected && $previous !== null && $canMove($node->id, TreeSlot::children($previous->id), TreePosition::end()),
                     'canMoveOut' => $selected && $parentId !== null && $canMove($node->id, $slot($locations[$parentId]->parentId), TreePosition::after($parentId)),
                     'canAddChild' => $selected && $supported && $definition->allowedChildren()->allowedTypes !== [] && ($definition->allowedChildren()->maximum === null || count($node->children) < $definition->allowedChildren()->maximum),
+                    'singleChildType' => $supported && count($definition->allowedChildren()->allowedTypes) === 1 ? $definition->allowedChildren()->allowedTypes[0] : null,
+                    'singleChildLabel' => $supported && count($definition->allowedChildren()->allowedTypes) === 1 ? ($this->forms->resolve($definition->allowedChildren()->allowedTypes[0])?->label() ?? 'item') : null,
                     'children' => []];
                 $flat[] = $entry;
                 $entry['acceptsChildren'] = $supported && $definition->allowedChildren()->allowedTypes !== [] && ($definition->allowedChildren()->maximum === null || count($node->children) < $definition->allowedChildren()->maximum);

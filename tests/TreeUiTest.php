@@ -14,6 +14,23 @@ use SiteBuilder\Filament\Tests\Fixtures\EditorUiTestCase;
 
 class TreeUiTest extends EditorUiTestCase
 {
+    public function test_tabs_and_accordion_have_guarded_child_creation_and_editable_nested_content(): void
+    {
+        foreach (['standard.tabs' => ['standard.tab-panel', 'Add tab panel'], 'standard.accordion' => ['standard.accordion-item', 'Add disclosure item']] as $type => [$childType, $label]) {
+            $page = $this->page('panels-'.str_replace('.', '-', $type));
+            $editor = Livewire::test(PageEditor::class, ['record' => $page->id])->call('addTreeSection', $type)->assertSet('state', 'saved')->assertSee($label);
+            $root = $page->fresh()->draft_content->nodes[1];
+            $editor->call('addTreeSection', $childType, $root->id)->assertSet('state', 'saved');
+            $this->assertCount(3, $page->fresh()->draft_content->nodes[1]->children);
+            $panel = $page->fresh()->draft_content->nodes[1]->children[2];
+            $editor->call('addTreeSection', 'standard.heading', $panel->id)->assertSet('state', 'saved');
+            $this->assertSame('standard.heading', $page->fresh()->draft_content->nodes[1]->children[2]->children[1]->type);
+            $version = $page->fresh()->write_version;
+            $editor->call('addTreeSection', $childType)->assertSet('state', 'invalid');
+            $this->assertSame($version, $page->fresh()->write_version);
+        }
+    }
+
     public function test_nested_native_fields_insert_preview_and_moves_preserve_identity_locales_and_ancestor_design(): void
     {
         $this->installOptional('history-migrations');

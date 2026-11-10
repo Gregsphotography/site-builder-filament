@@ -12,6 +12,6 @@ final class EditorPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel->default()->id('package-test')->path('package-test')->plugins([SiteBuilderPlugin::make()]);
+        return $panel->default()->id('package-test')->path('package-test')->plugins([SiteBuilderPlugin::make()->forms()]);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SiteBuilder\Filament\Forms;
 
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -13,17 +14,26 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use SiteBuilder\Core\Components\PropertyDefinition;
 use SiteBuilder\Core\Contracts\ComponentDefinition;
 use SiteBuilder\Core\Models\Page;
 use SiteBuilder\Filament\Contracts\ComponentForm;
+use SiteBuilder\Filament\Contracts\TypedMediaPicker;
+use SiteBuilder\Filament\Support\OptionalForms;
 
 /** Optional forms follow the installed core schema; no component-pack dependency. */
 final readonly class StandardComponentForm implements ComponentForm
 {
     private const LABELS = [
+        'form' => 'Contact / enquiry form',
+        'video' => 'Video', 'location' => 'Location and map',
+        'tabs' => 'Tabs', 'tab-panel' => 'Tab panel', 'accordion' => 'Accordion', 'accordion-item' => 'Disclosure item',
+        'table' => 'Table', 'table-of-contents' => 'Table of contents', 'breadcrumbs' => 'Breadcrumbs',
+        'heading' => 'Heading', 'buttons' => 'Button or button group', 'icon' => 'Icon', 'icon-list' => 'Icon list',
+        'social-links' => 'Social links', 'divider' => 'Divider', 'anchor' => 'Named anchor',
         'hero' => 'Hero', 'text' => 'Text', 'image' => 'Image', 'image-text' => 'Image and text',
         'cards' => 'Cards and logos', 'cta' => 'Call to action', 'faq' => 'Questions and answers',
         'contact-details' => 'Contact details', 'section' => 'Section', 'container' => 'Container',
@@ -73,13 +83,18 @@ final readonly class StandardComponentForm implements ComponentForm
         $fields = [];
         foreach ($properties as $name => $property) {
             $field = match ($property->kind) {
-                'text' => in_array($name, ['quote', 'caption'], true) ? Textarea::make($name)->rows($name === 'quote' ? 5 : 3) : TextInput::make($name),
+                'text' => match (true) {
+                    $this->type() === 'standard.form' && $name === 'profile' => Select::make($name)->label('Approved enquiry destination')->options(fn (): array => app(OptionalForms::class)->profileOptions())->live()->afterStateUpdated(fn ($state, Set $set) => $set('installation', app(OptionalForms::class)->runtime()?->installation()))->helperText('Choose a destination you are permitted to use. Configure the optional forms runtime first.'),
+                    $this->type() === 'standard.form' && $name === 'installation' => Hidden::make($name),
+                    in_array($name, ['quote', 'caption', 'address', 'help'], true) => Textarea::make($name)->rows($name === 'quote' ? 5 : 3),
+                    default => TextInput::make($name),
+                },
                 'html' => RichEditor::make($name)->toolbarButtons(['bold', 'italic', 'link', 'bulletList', 'orderedList']),
                 'boolean' => Toggle::make($name),
                 'enum', 'token' => Select::make($name)->options(array_combine($property->options, array_map(Str::headline(...), $property->options))),
-                'media' => Select::make($name)->options([...array_fill_keys($originalReferences['media'], 'Existing image'), ...($context->mediaPicker?->options($context->locale) ?? [])])->searchable()
-                    ->disabled($context->readOnly || $context->mediaPicker === null)
-                    ->helperText($context->mediaPicker === null ? 'Connect a media picker or enable the optional local media library.' : 'Choose an image from the media library.'),
+                'media' => Select::make($name)->options([...array_fill_keys($originalReferences['media'], $property->mediaKind === 'image' ? 'Existing image' : 'Existing media'), ...($context->mediaPicker instanceof TypedMediaPicker ? $context->mediaPicker->optionsForKind($context->locale, $property->mediaKind) : ($property->mediaKind === 'image' ? ($context->mediaPicker?->options($context->locale) ?? []) : []))])->searchable()
+                    ->disabled($context->readOnly || $context->mediaPicker === null || ($property->mediaKind !== 'image' && ! $context->mediaPicker instanceof TypedMediaPicker))
+                    ->helperText('Choose '.$property->mediaKind.' media. A typed picker is required for videos and captions.'),
                 'page' => $this->pageField($name, $originalReferences['page']),
                 'object' => Group::make($this->fields($property->properties, $context, $originalReferences))->statePath($name),
                 'list' => Repeater::make($name)->schema($this->fields($property->items->properties, $context, $originalReferences))->defaultItems(0)->reorderableWithButtons()

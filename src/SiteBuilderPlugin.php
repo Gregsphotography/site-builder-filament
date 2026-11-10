@@ -22,6 +22,8 @@ final class SiteBuilderPlugin implements Plugin
 
     private bool $withMediaLibrary = false;
 
+    private bool $withForms = false;
+
     public static function make(): self
     {
         return new self;
@@ -50,7 +52,7 @@ final class SiteBuilderPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
-        $panel->resources([PageResource::class, SitePartResource::class])->pages([ComponentLibrary::class, ...($this->withMediaLibrary ? [MediaLibrary::class] : []), ...$this->additionalPages]);
+        $panel->resources([PageResource::class, SitePartResource::class])->pages([ComponentLibrary::class, ...($this->withMediaLibrary ? [MediaLibrary::class] : []), ...($this->withForms ? [Pages\FormProfiles::class, Pages\FormInbox::class] : []), ...$this->additionalPages]);
         $panel->authenticatedRoutes(function (): void {
             Route::get('/site-builder/site-parts/{part}/preview', SitePartPreview::class)->middleware('signed')->name('site-builder.part-preview');
             Route::post('/site-builder/site-parts/{part}/release', ReleaseSitePartLease::class)->name('site-builder.part-release');
@@ -60,4 +62,11 @@ final class SiteBuilderPlugin implements Plugin
     }
 
     public function boot(Panel $panel): void {}
+
+    public function forms(bool $enabled = true): self
+    {
+        $this->withForms = $enabled;
+
+        return $this;
+    }
 }
