@@ -25,7 +25,6 @@ use SiteBuilder\Core\Content\Document;
 use SiteBuilder\Core\Content\JsonObject;
 use SiteBuilder\Core\Content\Node;
 use SiteBuilder\Core\Models\Page;
-use SiteBuilder\Core\SiteBuilderServiceProvider;
 use SiteBuilder\Core\Tests\DatabaseTestCase;
 use SiteBuilder\Filament\SiteBuilderFilamentServiceProvider;
 
@@ -66,7 +65,7 @@ abstract class EditorUiTestCase extends DatabaseTestCase
 
     protected function installOptional(string $folder): void
     {
-        $this->artisan('migrate', ['--path' => realpath(dirname((new \ReflectionClass(SiteBuilderServiceProvider::class))->getFileName(), 2).'/database/'.$folder), '--realpath' => true, '--force' => true])->assertExitCode(0);
+        $this->artisan('migrate', ['--path' => realpath(dirname((new \ReflectionClass(\SiteBuilder\Core\SiteBuilderServiceProvider::class))->getFileName(), 2).'/database/'.$folder), '--realpath' => true, '--force' => true])->assertExitCode(0);
     }
 
     protected function page(string $slug = 'tree-page', ?Document $document = null): Page

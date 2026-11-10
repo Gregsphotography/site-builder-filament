@@ -67,7 +67,7 @@ trait HistoriesDraft
             $this->flushSection();
             $context = $this->draftHistoryContext();
             if ($context === null) {
-                throw ValidationException::withMessages(['history' => 'Document undo is unavailable until its optional history store is installed.']);
+                throw ValidationException::withMessages(['history' => $this->draftHistoryUnavailableMessage ?: 'Document undo is unavailable for this draft.']);
             }
             $history = app(DraftHistory::class);
             $result = $redo ? $history->redo($this->actor(), $this->pageId, $this->leaseToken, $this->writeVersion, $context)
@@ -95,12 +95,18 @@ trait HistoriesDraft
             $this->draftHistoryUnavailableMessage = '';
         }
         if ($this->readOnly || $this->draftHistoryDisabled || ! app(DraftHistory::class)->available()) {
+            if ($this->readOnly) {
+                $this->draftHistoryUnavailableMessage = 'Document undo is unavailable while this page is read only. Request editing access to start a history session.';
+            } elseif (! $this->draftHistoryDisabled) {
+                $this->draftHistoryUnavailableMessage = 'Document undo is unavailable until its optional history store is installed.';
+            }
             $this->draftHistoryContextData = [];
             $this->draftHistoryState = ['available' => false, 'undoCount' => 0, 'redoCount' => 0, 'canUndo' => false, 'canRedo' => false, 'evicted' => false];
 
             return;
         }
         try {
+            $this->draftHistoryUnavailableMessage = '';
             $this->acceptDraftHistory(app(DraftHistory::class)->open($this->actor(), $this->pageId, $this->leaseToken, $this->tabId, $reset));
         } catch (ValidationException $exception) {
             $this->draftHistoryContextData = [];

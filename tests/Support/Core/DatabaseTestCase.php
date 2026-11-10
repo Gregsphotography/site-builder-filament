@@ -6,7 +6,6 @@ namespace SiteBuilder\Core\Tests;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use SiteBuilder\Core\SiteBuilderServiceProvider;
 
 abstract class DatabaseTestCase extends TestCase
 {
@@ -28,6 +27,6 @@ abstract class DatabaseTestCase extends TestCase
 
     protected function migrationOptions(): array
     {
-        return ['--path' => dirname((new \ReflectionClass(SiteBuilderServiceProvider::class))->getFileName(), 2).'/database/migrations', '--realpath' => true, '--force' => true];
+        return ['--path' => dirname((new \ReflectionClass(\SiteBuilder\Core\SiteBuilderServiceProvider::class))->getFileName(), 2).'/database/migrations', '--realpath' => true, '--force' => true];
     }
 }

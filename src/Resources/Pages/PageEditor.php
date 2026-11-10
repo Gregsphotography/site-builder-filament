@@ -496,6 +496,11 @@ final class PageEditor extends ResourcePage
     private function flushSettings(): void
     {
         if ($this->same($this->settingsBaseline, $this->settingsData)) {
+            if ($this->getErrorBag()->has('settingsData.slug')) {
+                $this->resetValidation('settingsData.slug');
+                $this->message = '';
+            }
+
             return;
         }
         $this->editable();
@@ -536,8 +541,18 @@ final class PageEditor extends ResourcePage
                 }
             }
         }
-        $slugs = $this->same($this->settingsBaseline['slug'] ?? null, $data['slug'] ?? null) ? null : [$this->locale => ($data['slug'] ?: null)];
-        $this->accept(app(PageCommands::class)->saveMetadata($this->actor(), $this->pageId, $this->leaseToken, $this->writeVersion, $metadata, $slugs, $this->draftHistoryContext(), new LogicalAction('metadata', 'Change page settings')));
+        $slug = $data['slug'] ?? null;
+        $slugs = $this->same($this->settingsBaseline['slug'] ?? null, $slug) ? null : [$this->locale => ($slug === '' ? null : $slug)];
+        try {
+            $this->accept(app(PageCommands::class)->saveMetadata($this->actor(), $this->pageId, $this->leaseToken, $this->writeVersion, $metadata, $slugs, $this->draftHistoryContext(), new LogicalAction('metadata', 'Change page settings')));
+        } catch (ValidationException $exception) {
+            $errors = $exception->errors();
+            if (isset($errors['slugs'])) {
+                $errors['settingsData.slug'] = $errors['slugs'];
+                unset($errors['slugs']);
+            }
+            throw ValidationException::withMessages($errors);
+        }
         $this->settingsBaseline = $this->settingsData;
         $this->message = 'Page settings saved. These shared settings take effect immediately.';
         $this->fillDesign();

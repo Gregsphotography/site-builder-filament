@@ -9,7 +9,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-use SiteBuilder\Components\ComponentsServiceProvider;
 use SiteBuilder\Components\Examples\StandardExamples;
 use SiteBuilder\Components\Media\MediaLibrary;
 use SiteBuilder\Core\Composition\CompositionCommands;
@@ -168,7 +167,7 @@ class GalleryUiTest extends EditorUiTestCase
 
     public function test_owned_batch_adapter_rechecks_files_public_visibility_permission_order_and_localized_metadata(): void
     {
-        $this->artisan('migrate', ['--path' => realpath(dirname((new \ReflectionClass(ComponentsServiceProvider::class))->getFileName(), 2).'/database/migrations'), '--realpath' => true, '--force' => true])->assertExitCode(0);
+        $this->artisan('migrate', ['--path' => realpath(dirname((new \ReflectionClass(\SiteBuilder\Components\ComponentsServiceProvider::class))->getFileName(), 2).'/database/migrations'), '--realpath' => true, '--force' => true])->assertExitCode(0);
         config(['filesystems.disks.public.visibility' => 'public']);
         Storage::fake('public');
         $library = app(MediaLibrary::class);

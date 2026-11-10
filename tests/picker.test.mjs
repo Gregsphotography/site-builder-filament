@@ -99,6 +99,30 @@ test('accepted focus resolves a replaced root and waits for enabled controls wit
 });
 
 
+test('accepted focus reveals only the clipped portion inside the active panel', () => {
+  const frames = [];
+  const panel = { scrollTop: 100, clientTop: 0, clientHeight: 300, getBoundingClientRect: () => ({top:80}) };
+  let bounds = { top: 50, bottom: 92 };
+  let focused = 0;
+  const target = { isConnected: true, disabled: false, getClientRects: () => [1], focus: () => focused++, closest: () => panel, getBoundingClientRect: () => bounds };
+  const root = { isConnected: true, querySelectorAll: () => [{dataset:{nodeId:'selected'},querySelector:() => target}] };
+  const document = {body:{},activeElement:null};
+  const reveal = () => { focusAcceptedSection(root, document, 'selected', {schedule: callback => frames.push(callback)}); frames.shift()(); };
+  reveal();
+  assert.equal(panel.scrollTop, 66);
+  bounds = {top:350,bottom:392};
+  reveal();
+  assert.equal(panel.scrollTop, 82);
+  bounds = {top:100,bottom:142};
+  reveal();
+  assert.equal(panel.scrollTop, 82);
+  document.activeElement = {isConnected:true,getClientRects:()=>[1],closest:()=>null};
+  bounds = {top:0,bottom:42};
+  reveal();
+  assert.equal(panel.scrollTop, 82);
+  assert.equal(focused, 3);
+});
+
 test('design edits participate in autosave while viewport and unreviewed theme remain distinct', () => {
   const state = editor({});
   state.$wire = { formData: { heading: 'Accepted' }, formBaseline: { heading: 'Accepted' }, designData: { align: null }, designBaseline: { align: null }, designThemeChoice: null, designThemeBaseline: null };

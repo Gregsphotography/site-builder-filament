@@ -30,7 +30,6 @@ use SiteBuilder\Core\Persistence\PageCommands;
 use SiteBuilder\Core\Rendering\LayoutRegistry;
 use SiteBuilder\Core\SavedSections\SavedSection;
 use SiteBuilder\Core\SavedSections\SavedSectionCommands;
-use SiteBuilder\Core\SiteBuilderServiceProvider;
 use SiteBuilder\Core\Tests\DatabaseTestCase;
 use SiteBuilder\Core\Tests\Fixtures\RenderBlock;
 use SiteBuilder\Filament\Contracts\ComponentForm;
@@ -274,7 +273,7 @@ class CompositionUiTest extends DatabaseTestCase
 
     private function installSavedSections(): void
     {
-        $this->artisan('migrate', ['--path' => dirname((new \ReflectionClass(SiteBuilderServiceProvider::class))->getFileName(), 2).'/database/saved-sections-migrations', '--realpath' => true, '--force' => true])->assertExitCode(0);
+        $this->artisan('migrate', ['--path' => dirname((new \ReflectionClass(\SiteBuilder\Core\SiteBuilderServiceProvider::class))->getFileName(), 2).'/database/saved-sections-migrations', '--realpath' => true, '--force' => true])->assertExitCode(0);
     }
 
     private function page(): Page

@@ -58,7 +58,16 @@ final class CreatePage extends Page
             throw ValidationException::withMessages(['data.template' => 'Choose an available page template.']);
         }
         $document = $template ? $components->template($template, $locale) : null;
-        $result = app(PageCommands::class)->create($actor, ['title' => $data['title'], 'layout' => $data['layout'] ?: null], [$locale => $data['slug']], $document);
+        try {
+            $result = app(PageCommands::class)->create($actor, ['title' => $data['title'], 'layout' => $data['layout'] ?: null], [$locale => $data['slug']], $document);
+        } catch (ValidationException $exception) {
+            $errors = $exception->errors();
+            if (isset($errors['slugs'])) {
+                $errors['data.slug'] = $errors['slugs'];
+                unset($errors['slugs']);
+            }
+            throw ValidationException::withMessages($errors);
+        }
         $this->redirect(PageResource::getUrl('edit', ['record' => $result->page->id]));
     }
 }

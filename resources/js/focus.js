@@ -47,11 +47,23 @@ function waitForEditorFocus(root, document, find, { schedule = callback => reque
     const target = find(currentRoot);
     if (target?.isConnected && !target.disabled && target.getClientRects().length) {
       target.focus({ preventScroll: true });
+      revealEditorControl(target);
       return;
     }
     if (remaining > 0) schedule(() => tryFocus(remaining - 1));
   };
   schedule(() => tryFocus(attempts));
+}
+
+function revealEditorControl(target) {
+  const panel = target.closest?.('.sb-panel');
+  if (!panel) return;
+  const bounds = panel.getBoundingClientRect();
+  const control = target.getBoundingClientRect();
+  const top = bounds.top + panel.clientTop + 4;
+  const bottom = bounds.top + panel.clientTop + panel.clientHeight - 4;
+  if (control.top < top) panel.scrollTop += control.top - top;
+  else if (control.bottom > bottom) panel.scrollTop += Math.min(control.bottom - bottom, control.top - top);
 }
 
 export function resolveEditorRoot(root, document) {
