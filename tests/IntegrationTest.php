@@ -22,6 +22,7 @@ use SiteBuilder\Filament\Contracts\ComponentForm;
 use SiteBuilder\Filament\Forms\ComponentFormRegistry;
 use SiteBuilder\Filament\Forms\EditorContext;
 use SiteBuilder\Filament\Pages\ComponentLibrary;
+use SiteBuilder\Filament\Pages\PopupLibrary;
 use SiteBuilder\Filament\Resources\Pages\PageResource;
 use SiteBuilder\Filament\Resources\SiteParts\SitePartResource;
 use SiteBuilder\Filament\SiteBuilderFilamentServiceProvider;
@@ -95,7 +96,7 @@ class IntegrationTest extends TestCase
         $plugin->register($panel);
         $plugin->register($panel);
         $this->assertSame([PageResource::class, SitePartResource::class], $panel->getResources());
-        $this->assertSame([ComponentLibrary::class], $panel->getPages());
+        $this->assertSame([ComponentLibrary::class, PopupLibrary::class], $panel->getPages());
         $this->assertFalse(PageResource::canCreate());
         $this->assertFalse(PageResource::canViewAny());
         $this->assertFalse(SitePartResource::canViewAny());

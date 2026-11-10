@@ -7,6 +7,7 @@ namespace SiteBuilder\Filament\Resources\SiteParts;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\Page as ResourcePage;
@@ -23,6 +24,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use SiteBuilder\Core\Components\ComponentRegistry;
+use SiteBuilder\Core\Composition\CompositionData;
+use SiteBuilder\Core\Composition\OverlaySettings;
 use SiteBuilder\Core\Composition\SitePartCopyCommands;
 use SiteBuilder\Core\Composition\SourceSelection;
 use SiteBuilder\Core\Composition\StartingPointRegistry;
@@ -208,7 +211,11 @@ final class SitePartEditor extends ResourcePage
     #[Unexposed]
     public function settingsForm(Schema $schema): Schema
     {
-        return $schema->components([TextInput::make('name')->required()->maxLength(255), Textarea::make('description')->rows(3)])->statePath('settingsData')->disabled($this->readOnly);
+        return $schema->components([TextInput::make('name')->required()->maxLength(255), Textarea::make('description')->rows(3), ...($this->kind === 'overlay' ? [
+            TextInput::make('overlay_title')->label('Popup title · '.strtoupper($this->locale))->required()->maxLength(255),
+            Select::make('presentation')->options(['dialog' => 'Centered dialog', 'drawer-left' => 'Drawer from left', 'drawer-right' => 'Drawer from right'])->required(),
+            Select::make('size')->options(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large', 'full' => 'Full'])->required(),
+        ] : [])])->statePath('settingsData')->disabled($this->readOnly);
     }
 
     public function saveSelected(int $requestId = 0): array
@@ -432,7 +439,12 @@ final class SitePartEditor extends ResourcePage
         }
         $this->withGuard(function (): void {
             $data = $this->settingsForm->getState();
-            $this->accept(app(SitePartCommands::class)->saveMetadata($this->actor(), $this->partId, $this->leaseToken, $this->writeVersion, $data, $this->historyContext()));
+            if ($this->kind === 'overlay') {
+                $document = OverlaySettings::with($this->document(), $this->locale, $data['overlay_title'], $data['presentation'], $data['size']);
+                $this->saveDocument($document, 'Edit popup settings');
+            }
+            $metadata = array_intersect_key($data, array_flip(['name', 'description']));
+            $this->accept(app(SitePartCommands::class)->saveMetadata($this->actor(), $this->partId, $this->leaseToken, $this->writeVersion, $metadata, $this->historyContext()));
             $this->settingsBaseline = $this->settingsData;
         });
     }
@@ -626,7 +638,7 @@ final class SitePartEditor extends ResourcePage
                 $next = $this->replaceNode($this->document(), $replacement);
                 $changed = array_keys(array_filter($this->formData, fn ($value, $key): bool => ! $this->same($this->formBaseline[$key] ?? null, $value), ARRAY_FILTER_USE_BOTH));
                 $typing = $this->typingGroup !== null && count($changed) <= 64 && $changed !== [] && array_all($changed, fn ($key): bool => preg_match('/^[a-zA-Z_][a-zA-Z0-9_.-]{0,127}$/D', $key) === 1 && in_array($definition->properties()[$key]->kind ?? null, ['text', 'html', 'url'], true));
-                $this->accept(app(SitePartCommands::class)->saveDraft($this->actor(), $this->partId, $this->leaseToken, $this->writeVersion, SitePartPayload::document($this->kind, $next), $this->historyContext(), new LogicalAction($typing ? 'typing' : 'save', 'Edit site-part content', $typing ? $this->typingGroup : null, $node->id, $this->locale, $typing ? $changed : [])));
+                $this->accept(app(SitePartCommands::class)->saveDraft($this->actor(), $this->partId, $this->leaseToken, $this->writeVersion, SitePartPayload::document($this->kind, CompositionData::promote($next)), $this->historyContext(), new LogicalAction($typing ? 'typing' : 'save', 'Edit site-part content', $typing ? $this->typingGroup : null, $node->id, $this->locale, $typing ? $changed : [])));
                 $this->formBaseline = $this->formData;
                 $this->resetErrorBag();
             });
@@ -730,7 +742,8 @@ final class SitePartEditor extends ResourcePage
     {
         $part = $this->part();
         $this->cacheSchema('settingsForm', $this->settingsForm(Schema::make($this)));
-        $this->settingsForm->fill(['name' => $part->name, 'description' => $part->description]);
+        $overlay = $this->kind === 'overlay' ? OverlaySettings::values($this->document(), $this->locale) : [];
+        $this->settingsForm->fill(['name' => $part->name, 'description' => $part->description, ...($overlay === [] ? [] : ['overlay_title' => $overlay['title'], 'presentation' => $overlay['presentation'], 'size' => $overlay['size']])]);
         $this->settingsBaseline = $this->settingsData;
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SiteBuilder\Filament\Forms;
 
 use SiteBuilder\Core\Components\PropertyDefinition;
+use SiteBuilder\Core\Composition\PublishedPartReference;
 use SiteBuilder\Core\Content\JsonObject;
 use SiteBuilder\Core\Content\Node;
 use SiteBuilder\Core\Contracts\ComponentDefinition;
@@ -25,7 +26,7 @@ final class NodeFormState
         foreach ($definition->properties() as $key => $property) {
             $map = $property->translated ? ($node->translations->get($locale) ?? new stdClass) : $node->props->toObject();
             if (property_exists($map, $key)) {
-                $values[$key] = $this->formValue($map->{$key});
+                $values[$key] = $this->projectValue($map->{$key}, $property);
             }
         }
 
@@ -54,6 +55,9 @@ final class NodeFormState
 
     private function merge(mixed $original, PropertyDefinition $property, mixed $value, mixed $baseline, mixed $current, array $clones = []): mixed
     {
+        if ($property->kind === 'revision' && $property->revisionKind !== null && is_array($value)) {
+            return PublishedPartReference::from((object) $value)->jsonSerialize();
+        }
         if ($value === null && ! $property->nullable && in_array($property->kind, ['text', 'html'], true)) {
             return '';
         }
@@ -92,6 +96,26 @@ final class NodeFormState
         }
 
         return $value;
+    }
+
+    private function projectValue(mixed $value, PropertyDefinition $property): mixed
+    {
+        if ($property->kind === 'revision' && $property->revisionKind !== null && $value !== null) {
+            return PublishedPartReference::from($value)->revisionId;
+        }
+        if ($property->kind === 'object' && $value instanceof stdClass) {
+            $result = [];
+            foreach (get_object_vars($value) as $key => $item) {
+                $result[$key] = isset($property->properties[$key]) ? $this->projectValue($item, $property->properties[$key]) : $this->formValue($item);
+            }
+
+            return $result;
+        }
+        if ($property->kind === 'list' && is_array($value)) {
+            return array_map(fn ($item) => $this->projectValue($item, $property->items), $value);
+        }
+
+        return $this->formValue($value);
     }
 
     private function same(mixed $left, mixed $right): bool

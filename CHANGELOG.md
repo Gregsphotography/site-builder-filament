@@ -1,13 +1,5 @@
 # Changelog
 
-## 0.4.0-rc.4 — staged
+## 0.5.0-rc.1 — staged
 
-Component library cards open read-only, isolated examples of installed standard components. Page-dependent and unavailable examples are explained, and keyboard users can close the preview with Escape. Page content and publishing are unchanged.
-
-## 0.4.0-rc.3 — staged
-
-Adds schematic illustrations to the component library and editor picker, including every standard component. Custom components and saved or template entries receive a neutral fallback. Content and publishing behaviour are unchanged.
-
-## 0.4.0-rc.2 — staged
-
-Adds composition primitives and editable patterns; accessible tabs, accordion, tables, contents and breadcrumbs; uploaded/embedded video, captions and location; optional published-form verification, enquiry inbox, managed notification profiles and durable outbox; independent on-page cards/gallery search and tag filters. Existing document v1/exchange v3 remain stable. Forms require explicit install/enable and host policies/queue; no consumer deployment is included.
+Adds shared public content sources/indexing, dynamic listings/filtering, live and full-page search, reusable revision-pinned popups/drawers, image comparison/hotspots, one carousel engine and authored/dynamic timelines. Preserves component library illustrations/examples and packages the demo PostgreSQL authoring compatibility fixes. New distribution uses gregsphotography package names and MIT. Existing content v1 and native exchange v3 remain unchanged.

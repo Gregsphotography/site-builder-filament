@@ -36,6 +36,13 @@ final readonly class ComponentExamples
             'demo.cta' => 'standard.cta',
             default => $type,
         };
+        if (in_array($type, ['standard.content-listing', 'standard.search-box', 'standard.search-results'], true)) {
+            return ['html' => null, 'note' => match ($type) {
+                'standard.content-listing' => 'This listing uses a registered published content source. Configure discovery storage and publish some content to see real results.',
+                'standard.search-box' => 'Choose a published results page. Visitors can use live suggestions or submit a normal search.',
+                default => 'Results come from published content in the current language. Add this component to your search results page.',
+            }];
+        }
         $examples = $this->container->make(self::EXAMPLES);
         $entry = $examples->entries()[$exampleType] ?? null;
         if ($entry === null) {

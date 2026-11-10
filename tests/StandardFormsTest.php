@@ -31,6 +31,7 @@ use SiteBuilder\Filament\Forms\ComponentFormRegistry;
 use SiteBuilder\Filament\Forms\EditorContext;
 use SiteBuilder\Filament\Pages\ComponentLibrary;
 use SiteBuilder\Filament\Pages\MediaLibrary;
+use SiteBuilder\Filament\Pages\PopupLibrary;
 use SiteBuilder\Filament\Resources\Pages\PageResource;
 use SiteBuilder\Filament\SiteBuilderFilamentServiceProvider;
 use SiteBuilder\Filament\SiteBuilderPlugin;
@@ -163,7 +164,7 @@ class StandardFormsTest extends TestCase
         $this->assertTrue(ComponentLibrary::canAccess());
         $this->assertFalse(MediaLibrary::canAccess());
         SiteBuilderPlugin::make()->mediaLibrary()->register($panel);
-        $this->assertSame([ComponentLibrary::class, MediaLibrary::class], $panel->getPages());
+        $this->assertSame([ComponentLibrary::class, PopupLibrary::class, MediaLibrary::class], $panel->getPages());
         $this->app->singleton('SiteBuilder\\Components\\Media\\MediaLibrary', fn () => new class
         {
             public function available(): bool

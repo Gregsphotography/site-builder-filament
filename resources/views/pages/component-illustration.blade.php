@@ -1,5 +1,26 @@
 <svg viewBox="0 0 160 96" aria-hidden="true" focusable="false">
     @switch($type)
+        @case('standard.content-listing')
+            <rect x="17" y="30" width="38" height="48" rx="3"/><rect x="61" y="30" width="38" height="48" rx="3"/><rect x="105" y="30" width="38" height="48" rx="3"/><path d="M18 18h80m-70 24h17m27 0h17m27 0h17M28 58h17m27 0h17m27 0h17"/>
+            @break
+        @case('standard.search-box')
+            <rect x="15" y="30" width="130" height="35" rx="5"/><circle cx="39" cy="45" r="8"/><path d="m45 51 7 7m11-12h47m12-7 9 7-9 7"/>
+            @break
+        @case('standard.search-results')
+            <circle cx="29" cy="20" r="7"/><path d="m34 25 7 7m9-12h70M23 45h24m12 0h73M23 56h109M23 70h24m12 0h73M23 81h109"/>
+            @break
+        @case('standard.image-comparison')
+            <rect x="20" y="16" width="120" height="64" rx="3"/><path d="M80 16v64M27 64l20-27 23 27m19-15 14-16 29 31M71 46l-8 5 8 5m18-10 8 5-8 5"/>
+            @break
+        @case('standard.image-hotspots')
+            <rect x="20" y="16" width="120" height="64" rx="3"/><circle cx="52" cy="43" r="10"/><path d="M52 38v10m-5-5h10"/><circle cx="109" cy="57" r="10"/><path d="M109 52v10m-5-5h10M22 75l29-17 22 9"/>
+            @break
+        @case('standard.carousel')
+            <rect x="43" y="20" width="74" height="52" rx="3"/><path d="M31 25H18v42h13m98-42h13v42h-13M61 82h7m8 0h7m8 0h7m-44-25 15-17 14 10 12-14 12 21"/>
+            @break
+        @case('standard.timeline')
+            <path d="M44 16v64m20-58h64m-64 9h44m-44 21h64m-64 9h44m-44 17h64"/><circle cx="44" cy="25" r="5"/><circle cx="44" cy="55" r="5"/><circle cx="44" cy="78" r="5"/>
+            @break
         @case('standard.form')
             <rect x="22" y="12" width="116" height="72" rx="4" />
             <path d="M33 24h49" /><rect x="33" y="32" width="94" height="10" rx="2" /><rect x="33" y="47" width="94" height="10" rx="2" />

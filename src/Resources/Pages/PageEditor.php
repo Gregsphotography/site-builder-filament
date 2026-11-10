@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use SiteBuilder\Core\Components\ComponentRegistry;
+use SiteBuilder\Core\Composition\CompositionData;
 use SiteBuilder\Core\Content\CanonicalJson;
 use SiteBuilder\Core\Content\Document;
 use SiteBuilder\Core\Content\DocumentCodec;
@@ -56,6 +57,7 @@ use SiteBuilder\Filament\Resources\Pages\Concerns\ClipboardDraft;
 use SiteBuilder\Filament\Resources\Pages\Concerns\ComposesDraft;
 use SiteBuilder\Filament\Resources\Pages\Concerns\CopiesSnapshots;
 use SiteBuilder\Filament\Resources\Pages\Concerns\DesignsDraft;
+use SiteBuilder\Filament\Resources\Pages\Concerns\DiscoversDraft;
 use SiteBuilder\Filament\Resources\Pages\Concerns\HistoriesDraft;
 use SiteBuilder\Filament\Resources\Pages\Concerns\SelectsGalleryMedia;
 use SiteBuilder\Filament\Resources\Pages\Concerns\SitePartsDraft;
@@ -70,6 +72,7 @@ final class PageEditor extends ResourcePage
     use ComposesDraft;
     use CopiesSnapshots;
     use DesignsDraft;
+    use DiscoversDraft;
     use HistoriesDraft;
     use SelectsGalleryMedia;
     use SitePartsDraft;
@@ -481,7 +484,7 @@ final class PageEditor extends ResourcePage
                 $document = $this->document();
                 $next = $this->replaceTreeNode($document, $patched);
 
-                return app(PageCommands::class)->saveDraft($this->actor(), $this->pageId, $this->leaseToken, $this->writeVersion, $next, $this->draftHistoryContext(), $this->contentHistoryAction());
+                return app(PageCommands::class)->saveDraft($this->actor(), $this->pageId, $this->leaseToken, $this->writeVersion, CompositionData::promote($next), $this->draftHistoryContext(), $this->contentHistoryAction());
             });
             $this->accept($result);
             $this->formBaseline = $this->formData;
@@ -495,6 +498,7 @@ final class PageEditor extends ResourcePage
 
     private function flushSettings(): void
     {
+        $this->flushDiscovery();
         if ($this->same($this->settingsBaseline, $this->settingsData)) {
             if ($this->getErrorBag()->has('settingsData.slug')) {
                 $this->resetValidation('settingsData.slug');
@@ -626,6 +630,7 @@ final class PageEditor extends ResourcePage
             'schema_json' => json_encode($page->schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'data_json' => json_encode($page->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
         $this->settingsBaseline = $this->settingsData;
+        $this->fillDiscovery();
     }
 
     private function refreshPreview(): void

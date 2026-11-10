@@ -32,14 +32,14 @@ final class CreateSitePart extends Page
     public function mount(): void
     {
         abort_unless(SitePartResource::canCreate(), 403);
-        $this->form->fill();
+        $this->form->fill(request()->query('kind') === 'overlay' ? ['kind' => 'overlay'] : []);
     }
 
     #[Unexposed]
     public function form(Schema $schema): Schema
     {
         $actor = Filament::auth()->user() ?? abort(403);
-        $kinds = array_filter(['section' => 'Reusable section', 'header' => 'Site header', 'footer' => 'Site footer', 'design' => 'Site design defaults'], fn (string $label, string $kind): bool => Gate::forUser($actor)->allows('create', [SitePart::class, $kind]), ARRAY_FILTER_USE_BOTH);
+        $kinds = array_filter(['section' => 'Reusable section', 'header' => 'Site header', 'footer' => 'Site footer', 'design' => 'Site design defaults', 'overlay' => 'Popup or drawer'], fn (string $label, string $kind): bool => Gate::forUser($actor)->allows('create', [SitePart::class, $kind]), ARRAY_FILTER_USE_BOTH);
         $themes = array_filter(app(DesignCatalog::class)->themes($this->context()), fn (array $theme): bool => $theme['available']);
 
         return $schema->components([

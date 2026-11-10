@@ -99,6 +99,8 @@
                 <h2>Page settings</h2>
                 <p class="sb-help">Saving title, URLs, layout and search settings changes the live page immediately. Section drafts remain private until published.</p>
                 <form @submit.prevent="run('saveSettings')"><fieldset :disabled="$wire.readOnly || queue.blocked">{{ $this->settingsForm }}</fieldset><button class="sb-primary" type="submit" :disabled="busy || $wire.readOnly || queue.blocked">Save page settings</button></form>
+                <h3>Content discovery · {{ strtoupper($this->locale) }}</h3><p class="sb-help">These fields stay in the draft until you publish the page.</p>
+                <form @submit.prevent="run('saveDiscoverySettings')"><fieldset :disabled="$wire.readOnly || queue.blocked">{{ $this->discoveryForm }}</fieldset><button class="sb-primary" type="submit" :disabled="busy || $wire.readOnly || queue.blocked">Save discovery draft</button></form>
                 @if ($canPublish && $this->publicationStatus === 'published')<button type="button" @click="run('unpublish')" :disabled="busy || $wire.readOnly || queue.blocked">Unpublish page</button>@endif
                 @if ($canDelete)
                     <details class="sb-delete"><summary>Delete this page</summary><p>Review links and references to this page first. Deletion removes the page, URLs and content history.</p>

@@ -160,3 +160,10 @@
 .sb-tree-destination { display:grid; gap:.35rem; flex:1 1 100%; padding-top:.4rem; border-top:1px solid #d1ddd8; }
 .sb-tree-destination label { font-weight:600; font-size:.75rem; }
 .sb-tree-destination select { max-width:100%; width:100%; font-size:.75rem; }
+
+.sb-hotspot-placement { position: relative; max-width: 38rem; cursor: crosshair; touch-action: none; }
+.sb-hotspot-placement img { display: block; width: 100%; height: auto; }
+.sb-hotspot-placement button { position: absolute; transform: translate(-50%, -50%); width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #174e65; color: #fff; border: 3px solid #fff; box-shadow: 0 0 0 2px #174e65; cursor: grab; }
+.sb-hotspot-placement button:focus-visible { outline: 3px solid #8c3c00; outline-offset: 3px; }
+.sb-popup-library { display: grid; gap: 1rem; list-style: none; padding: 0; }
+.sb-popup-library > li { padding: 1rem; border: 1px solid currentColor; border-radius: .5rem; }

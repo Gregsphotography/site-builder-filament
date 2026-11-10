@@ -30,7 +30,7 @@ final class SitePartResource extends Resource
     {
         $actor = Filament::getCurrentPanel() === null ? null : Filament::auth()->user();
 
-        return $actor !== null && app(SitePartCatalog::class)->available() && array_any(['section', 'header', 'footer', 'design'], fn (string $kind): bool => Gate::forUser($actor)->allows('create', [SitePart::class, $kind]));
+        return $actor !== null && app(SitePartCatalog::class)->available() && array_any(['section', 'header', 'footer', 'design', 'overlay'], fn (string $kind): bool => Gate::forUser($actor)->allows('create', [SitePart::class, $kind]));
     }
 
     public static function table(Table $table): Table

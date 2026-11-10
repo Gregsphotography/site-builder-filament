@@ -12,14 +12,20 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use SiteBuilder\Core\Components\PropertyDefinition;
 use SiteBuilder\Core\Contracts\ComponentDefinition;
+use SiteBuilder\Core\Discovery\ContentSources;
 use SiteBuilder\Core\Models\Page;
+use SiteBuilder\Core\SiteParts\SitePart;
+use SiteBuilder\Core\SiteParts\SitePartCatalog;
+use SiteBuilder\Core\SiteParts\SitePartRevision;
 use SiteBuilder\Filament\Contracts\ComponentForm;
 use SiteBuilder\Filament\Contracts\TypedMediaPicker;
 use SiteBuilder\Filament\Support\OptionalForms;
@@ -29,6 +35,7 @@ final readonly class StandardComponentForm implements ComponentForm
 {
     private const LABELS = [
         'form' => 'Contact / enquiry form',
+        'content-listing' => 'Dynamic content listing', 'search-box' => 'Site search', 'search-results' => 'Search results', 'carousel' => 'Carousel', 'timeline' => 'Timeline', 'image-comparison' => 'Image comparison', 'image-hotspots' => 'Image hotspots',
         'video' => 'Video', 'location' => 'Location and map',
         'tabs' => 'Tabs', 'tab-panel' => 'Tab panel', 'accordion' => 'Accordion', 'accordion-item' => 'Disclosure item',
         'table' => 'Table', 'table-of-contents' => 'Table of contents', 'breadcrumbs' => 'Breadcrumbs',
@@ -74,6 +81,7 @@ final readonly class StandardComponentForm implements ComponentForm
         return $this->fields($this->definition->properties(), $context, [
             'media' => $this->references($this->definition->properties(), $context->originalValues, 'media'),
             'page' => $this->references($this->definition->properties(), $context->originalValues, 'page'),
+            'revision' => $this->references($this->definition->properties(), $context->originalValues, 'revision'),
         ]);
     }
 
@@ -84,6 +92,7 @@ final readonly class StandardComponentForm implements ComponentForm
         foreach ($properties as $name => $property) {
             $field = match ($property->kind) {
                 'text' => match (true) {
+                    $name === 'source' => Select::make($name)->options([...($this->type() === 'standard.search-results' ? ['*' => 'All registered sources'] : []), ...app(ContentSources::class)->options()]),
                     $this->type() === 'standard.form' && $name === 'profile' => Select::make($name)->label('Approved enquiry destination')->options(fn (): array => app(OptionalForms::class)->profileOptions())->live()->afterStateUpdated(fn ($state, Set $set) => $set('installation', app(OptionalForms::class)->runtime()?->installation()))->helperText('Choose a destination you are permitted to use. Configure the optional forms runtime first.'),
                     $this->type() === 'standard.form' && $name === 'installation' => Hidden::make($name),
                     in_array($name, ['quote', 'caption', 'address', 'help'], true) => Textarea::make($name)->rows($name === 'quote' ? 5 : 3),
@@ -96,29 +105,54 @@ final readonly class StandardComponentForm implements ComponentForm
                     ->disabled($context->readOnly || $context->mediaPicker === null || ($property->mediaKind !== 'image' && ! $context->mediaPicker instanceof TypedMediaPicker))
                     ->helperText('Choose '.$property->mediaKind.' media. A typed picker is required for videos and captions.'),
                 'page' => $this->pageField($name, $originalReferences['page']),
+                'revision' => $this->overlayField($name, $originalReferences['revision']),
                 'object' => Group::make($this->fields($property->properties, $context, $originalReferences))->statePath($name),
                 'list' => Repeater::make($name)->schema($this->fields($property->items->properties, $context, $originalReferences))->defaultItems(0)->reorderableWithButtons()
                     ->addable(! in_array('max:0', $property->rules, true))->helperText($this->type() === 'standard.testimonials' && $name === 'items' ? 'Single presentation shows the first item; every stored item is retained and validated.' : null),
-                'number' => TextInput::make($name)->numeric()->dehydrateStateUsing(self::number(...)),
+                'number' => $this->type() === 'standard.image-hotspots' && in_array($name, ['x', 'y'], true) ? TextInput::make($name)->numeric()->minValue(0)->maxValue(100)->step(.01)->formatStateUsing(fn ($state) => $state === null ? 50 : $state / 100)->dehydrateStateUsing(fn ($state) => (int) round((float) $state * 100)) : TextInput::make($name)->numeric()->dehydrateStateUsing(self::number(...)),
                 default => TextInput::make($name)->maxLength(match ($name) {
                     'heading' => 255, 'alt', 'caption' => 2000, default => null,
                 }),
             };
             if (method_exists($field, 'label')) {
                 $field->label(match ($name) {
+                    'x' => $this->type() === 'standard.image-hotspots' ? 'Horizontal position (%)' : 'X', 'y' => $this->type() === 'standard.image-hotspots' ? 'Vertical position (%)' : 'Y',
+                    'overlay' => 'Popup or drawer (takes priority)',
+                    'interval' => 'Autoplay interval (seconds)',
                     'page' => 'Link to page', 'secondary_page' => 'Secondary link to page',
                     'url' => 'Link URL', 'secondary_url' => 'Secondary link URL',
                     'alt' => 'Alternative text', 'decorative' => 'Decorative image (empty alternative text)',
                     default => Str::headline($name),
                 });
             }
+            if (in_array($this->type(), ['standard.carousel', 'standard.timeline'], true)) {
+                if (in_array($name, ['source', 'content_type', 'content_tag', 'sort', 'limit'], true)) {
+                    $field->visible(fn (Get $get): bool => $get('content_mode') === 'dynamic');
+                } elseif ($name === 'items') {
+                    $field->visible(fn (Get $get): bool => $get('content_mode') !== 'dynamic');
+                } elseif ($name === 'content_mode') {
+                    $field->live();
+                }
+            }
+            if ($name === 'source') {
+                $field->required();
+            }
+            if ($this->type() === 'standard.carousel' && $name === 'autoplay') {
+                $field->live();
+            }
+            if ($this->type() === 'standard.carousel' && $name === 'interval') {
+                $field->visible(fn (Get $get): bool => (bool) $get('autoplay'));
+            }
             if (in_array($property->kind, ['url', 'page'], true)) {
                 $field->helperText($property->kind === 'page' ? 'An internal page takes priority over the URL. Unpublished pages cannot create a public link.' : 'Use an https:// URL, a site path, mailto: or tel:.');
             }
-            if ($property->rules !== [] && method_exists($field, 'rules')) {
+            if ($property->rules !== [] && method_exists($field, 'rules') && ! ($this->type() === 'standard.image-hotspots' && in_array($name, ['x', 'y'], true))) {
                 $field->rules([...($property->nullable || $property->translated ? ['nullable'] : []), ...$property->rules]);
             }
             $fields[] = $field;
+            if ($this->type() === 'standard.image-hotspots' && $name === 'y') {
+                $fields[] = ViewField::make('_placement')->view('site-builder-filament::forms.hotspot-position')->dehydrated(false);
+            }
         }
 
         return $fields;
@@ -158,13 +192,48 @@ final readonly class StandardComponentForm implements ComponentForm
         })->dehydrateStateUsing(fn ($state): ?int => $state === null || $state === '' ? null : (int) $state);
     }
 
+    private function overlayField(string $name, array $original): Select
+    {
+        return Select::make($name)->label('Popup or drawer (takes priority)')->searchable()->getSearchResultsUsing(function (string $search): array {
+            $actor = Filament::auth()->user();
+            if ($actor === null || ! app(SitePartCatalog::class)->available()) {
+                return [];
+            }
+            $entries = app(SitePartCatalog::class)->searchPage($actor, $search, 'overlay')['entries'];
+
+            return $entries->filter(fn ($part) => $part->current_revision_id !== null && Gate::forUser($actor)->allows('use', $part))->mapWithKeys(fn ($part) => [$part->current_revision_id => $part->name])->all();
+        })->getOptionLabelUsing(function ($value) use ($original): ?string {
+            $revision = is_string($value) && app(SitePartCatalog::class)->available() ? SitePartRevision::query()->find($value) : null;
+            $part = $revision === null ? null : SitePart::query()->find($revision->resource_id);
+            $actor = Filament::auth()->user();
+            if ($part !== null && $actor !== null && Gate::forUser($actor)->allows('view', $part)) {
+                return $part->name.' · revision '.$revision->sequence;
+            }
+
+            return in_array($value, $original, true) ? 'Unavailable pinned popup' : null;
+        })->dehydrateStateUsing(function ($state) use ($original): ?array {
+            if ($state === null || $state === '') {
+                return null;
+            }
+            $actor = Filament::auth()->user() ?? abort(403);
+            if (in_array($state, $original, true)) {
+                $revision = SitePartRevision::query()->findOrFail($state);
+                $reference = $revision->reference();
+            } else {
+                $reference = app(SitePartCatalog::class)->reference($actor, $state);
+            }
+
+            return get_object_vars($reference->jsonSerialize());
+        })->helperText('Publish a popup in the popup library first. This action pins its exact revision. Clear it to use the page or URL instead.');
+    }
+
     /** Stored references stay selectable when another library owns them or their target is unavailable. */
     private function references(array $properties, array $values, string $kind): array
     {
         $references = [];
         foreach ($properties as $name => $property) {
             $value = $values[$name] ?? null;
-            if ($property->kind === $kind && (($kind === 'media' && is_string($value) && $value !== '') || ($kind === 'page' && is_int($value) && $value > 0))) {
+            if ($property->kind === $kind && (($kind === 'media' && is_string($value) && $value !== '') || ($kind === 'page' && is_int($value) && $value > 0) || ($kind === 'revision' && is_string($value)))) {
                 $references[] = $value;
             } elseif ($property->kind === 'object' && is_array($value)) {
                 $references = [...$references, ...$this->references($property->properties, $value, $kind)];
