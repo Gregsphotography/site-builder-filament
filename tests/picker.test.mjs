@@ -104,7 +104,7 @@ test('accepted focus reveals only the clipped portion inside the active panel', 
   const panel = { scrollTop: 100, clientTop: 0, clientHeight: 300, getBoundingClientRect: () => ({top:80}) };
   let bounds = { top: 50, bottom: 92 };
   let focused = 0;
-  const target = { isConnected: true, disabled: false, getClientRects: () => [1], focus: () => focused++, closest: () => panel, getBoundingClientRect: () => bounds };
+  const target = { isConnected: true, disabled: false, getClientRects: () => [1], focus: () => focused++, closest: selector => selector === '.sb-panel' ? panel : null, getBoundingClientRect: () => bounds };
   const root = { isConnected: true, querySelectorAll: () => [{dataset:{nodeId:'selected'},querySelector:() => target}] };
   const document = {body:{},activeElement:null};
   const reveal = () => { focusAcceptedSection(root, document, 'selected', {schedule: callback => frames.push(callback)}); frames.shift()(); };
@@ -121,6 +121,18 @@ test('accepted focus reveals only the clipped portion inside the active panel', 
   reveal();
   assert.equal(panel.scrollTop, 82);
   assert.equal(focused, 3);
+});
+
+test('accepted focus reveals a lower row in the independently scrolling section tree', () => {
+  const frames = [];
+  const tree = {scrollTop:0,clientTop:0,clientHeight:100,getBoundingClientRect:()=>({top:100})};
+  const panel = {scrollTop:0,clientTop:0,clientHeight:700,getBoundingClientRect:()=>({top:80})};
+  const target = {isConnected:true,disabled:false,getClientRects:()=>[1],focus:()=>{},closest:selector=>selector==='.sb-sections'?tree:panel,getBoundingClientRect:()=>({top:220-tree.scrollTop,bottom:262-tree.scrollTop})};
+  const root = {isConnected:true,querySelectorAll:()=>[{dataset:{nodeId:'lower-row'},querySelector:()=>target}]};
+  focusAcceptedSection(root,{body:{},activeElement:null},'lower-row',{schedule:callback=>frames.push(callback)});
+  frames.shift()();
+  assert.equal(tree.scrollTop,66);
+  assert.equal(panel.scrollTop,0);
 });
 
 test('design edits participate in autosave while viewport and unreviewed theme remain distinct', () => {

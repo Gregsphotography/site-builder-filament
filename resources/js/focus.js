@@ -56,14 +56,16 @@ function waitForEditorFocus(root, document, find, { schedule = callback => reque
 }
 
 function revealEditorControl(target) {
-  const panel = target.closest?.('.sb-panel');
-  if (!panel) return;
-  const bounds = panel.getBoundingClientRect();
-  const control = target.getBoundingClientRect();
-  const top = bounds.top + panel.clientTop + 4;
-  const bottom = bounds.top + panel.clientTop + panel.clientHeight - 4;
-  if (control.top < top) panel.scrollTop += control.top - top;
-  else if (control.bottom > bottom) panel.scrollTop += Math.min(control.bottom - bottom, control.top - top);
+  for (const selector of ['.sb-sections', '.sb-panel']) {
+    const panel = target.closest?.(selector);
+    if (!panel) continue;
+    const bounds = panel.getBoundingClientRect();
+    const control = target.getBoundingClientRect();
+    const top = bounds.top + panel.clientTop + 4;
+    const bottom = bounds.top + panel.clientTop + panel.clientHeight - 4;
+    if (control.top < top) panel.scrollTop += control.top - top;
+    else if (control.bottom > bottom) panel.scrollTop += Math.min(control.bottom - bottom, control.top - top);
+  }
 }
 
 export function resolveEditorRoot(root, document) {
