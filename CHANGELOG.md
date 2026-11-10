@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0-rc.4 — staged
+
+Component library cards open read-only, isolated examples of installed standard components. Page-dependent and unavailable examples are explained, and keyboard users can close the preview with Escape. Page content and publishing are unchanged.
+
 ## 0.4.0-rc.3 — staged
 
 Adds schematic illustrations to the component library and editor picker, including every standard component. Custom components and saved or template entries receive a neutral fallback. Content and publishing behaviour are unchanged.
