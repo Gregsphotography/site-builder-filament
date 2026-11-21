@@ -13,6 +13,6 @@ final class ListPages extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [Action::make('create')->label('Create page')->url(PageResource::getUrl('create'))->visible(PageResource::canCreate())];
+        return [Action::make('trash')->label('Trash')->url(PageResource::getUrl('trash')), Action::make('create')->label('Create page')->url(PageResource::getUrl('create'))->visible(PageResource::canCreate())];
     }
 }

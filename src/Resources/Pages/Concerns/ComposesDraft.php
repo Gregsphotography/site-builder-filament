@@ -398,7 +398,7 @@ trait ComposesDraft
         $savedAvailable = app(SavedSectionCommands::class)->available();
 
         return ['pickerEntries' => $entries, 'pickerCategories' => array_values(array_unique(array_column($entries, 'category'))),
-            'pickerLayoutLabel' => Str::headline(Str::afterLast($this->page()->layout ?? config('site-builder.layout'), '.')),
+            'pickerLayoutLabel' => Str::headline(Str::afterLast($this->page()->draftLayout() ?? config('site-builder.layout'), '.')),
             'savedSectionsAvailable' => $savedAvailable,
             'canCaptureSection' => $savedAvailable && $this->selectedId !== null && Gate::forUser($this->actor())->allows('create', SavedSection::class),
             'pickerPlacementLabel' => ($this->pickerPosition['parentId'] !== null ? 'Inside selected container · ' : '').match ($this->pickerPosition['kind']) {

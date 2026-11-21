@@ -299,7 +299,7 @@ trait DesignsDraft
 
     private function designRenderContext(): RenderContext
     {
-        return new RenderContext($this->locale, 'preview', $this->pageId, $this->page()->layout);
+        return new RenderContext($this->locale, 'preview', $this->pageId, $this->page()->draftLayout());
     }
 
     private function designThemes(): array

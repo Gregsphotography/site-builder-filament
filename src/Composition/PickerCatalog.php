@@ -49,7 +49,7 @@ final class PickerCatalog
             $diagnostic = '';
             $type = str_starts_with($descriptor->id, 'component:') ? substr($descriptor->id, 10) : null;
             if ($destination !== null && $type !== null && ($component = $this->components->resolve($type)) !== null) {
-                $context = new RenderContext($locale, 'preview', $destination->id, $destination->layout);
+                $context = new RenderContext($locale, 'preview', $destination->id, $destination->draftLayout());
                 $document = $destination->draft_content ?? new Document;
                 $permitted = app(DesignCatalog::class)->permittedVariants($document, $context, $type);
                 if ($permitted !== null) {
@@ -67,7 +67,7 @@ final class PickerCatalog
             }
             $placementAvailable = true;
             if ($destination !== null) {
-                $context = new RenderContext($locale, 'preview', $destination->id, $destination->layout);
+                $context = new RenderContext($locale, 'preview', $destination->id, $destination->draftLayout());
                 $document = $destination->draft_content ?? new Document;
                 if ($type !== null && $this->components->resolve($type) !== null) {
                     $defaultAvailable = $defaultAvailable && app(TreeOperations::class)->canInsertType($document, $type, $slot ?? TreeSlot::root(), $context);
@@ -107,7 +107,7 @@ final class PickerCatalog
                 if ($destination !== null) {
                     try {
                         $snapshot = $this->saved->snapshot($actor, $section->id, $section->current_version);
-                        $entry['insertable'] = app(TreeOperations::class)->canInsertNodes($destination->draft_content ?? new Document, $snapshot->document->nodes, $slot ?? TreeSlot::root(), new RenderContext($locale, 'preview', $destination->id, $destination->layout));
+                        $entry['insertable'] = app(TreeOperations::class)->canInsertNodes($destination->draft_content ?? new Document, $snapshot->document->nodes, $slot ?? TreeSlot::root(), new RenderContext($locale, 'preview', $destination->id, $destination->draftLayout()));
                     } catch (\InvalidArgumentException|ValidationException) {
                         $entry['insertable'] = false;
                     }
@@ -130,7 +130,7 @@ final class PickerCatalog
                 $entry = $this->savedEntry($section);
                 if ($destination !== null) {
                     $snapshot = $this->saved->snapshot($actor, $section->id, $section->current_version);
-                    $entry['insertable'] = app(TreeOperations::class)->canInsertNodes($destination->draft_content ?? new Document, $snapshot->document->nodes, $slot ?? TreeSlot::root(), new RenderContext($locale, 'preview', $destination->id, $destination->layout));
+                    $entry['insertable'] = app(TreeOperations::class)->canInsertNodes($destination->draft_content ?? new Document, $snapshot->document->nodes, $slot ?? TreeSlot::root(), new RenderContext($locale, 'preview', $destination->id, $destination->draftLayout()));
                     if (! $entry['insertable']) {
                         $entry['variantDiagnostic'] = 'This saved section does not fit the selected parent or current canvas requirements.';
                     }
@@ -164,7 +164,7 @@ final class PickerCatalog
 
     public function layoutDigest(Page $page): string
     {
-        return hash('sha256', json_encode([$page->layout, config('site-builder.layout'), config('site-builder-components.theme'), config('site-builder-components.assets'), app(CanonicalJson::class)->digest($page->draft_content?->extensions->get('site-builder.render'))], JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode([$page->draftLayout(), config('site-builder.layout'), config('site-builder-components.theme'), config('site-builder-components.assets'), app(CanonicalJson::class)->digest($page->draft_content?->extensions->get('site-builder.render'))], JSON_THROW_ON_ERROR));
     }
 
     private function savedEntry(object $section): array

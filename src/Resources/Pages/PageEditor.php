@@ -43,9 +43,11 @@ use SiteBuilder\Core\Persistence\MutationResult;
 use SiteBuilder\Core\Persistence\PageAccess;
 use SiteBuilder\Core\Persistence\PageCommands;
 use SiteBuilder\Core\Persistence\PageHistory;
+use SiteBuilder\Core\Persistence\PageIncomingLinks;
 use SiteBuilder\Core\Persistence\PageLocks;
 use SiteBuilder\Core\Rendering\LayoutRegistry;
 use SiteBuilder\Core\Rendering\LocaleCatalog;
+use SiteBuilder\Core\Rendering\Seo;
 use SiteBuilder\Core\Routing\PageUrlResolver;
 use SiteBuilder\Core\Routing\PreviewLinks;
 use SiteBuilder\Filament\Contracts\EditorIdentityName;
@@ -59,6 +61,9 @@ use SiteBuilder\Filament\Resources\Pages\Concerns\CopiesSnapshots;
 use SiteBuilder\Filament\Resources\Pages\Concerns\DesignsDraft;
 use SiteBuilder\Filament\Resources\Pages\Concerns\DiscoversDraft;
 use SiteBuilder\Filament\Resources\Pages\Concerns\HistoriesDraft;
+use SiteBuilder\Filament\Resources\Pages\Concerns\OpensEditorFindings;
+use SiteBuilder\Filament\Resources\Pages\Concerns\ReviewsAccessibility;
+use SiteBuilder\Filament\Resources\Pages\Concerns\ReviewsPublication;
 use SiteBuilder\Filament\Resources\Pages\Concerns\SelectsGalleryMedia;
 use SiteBuilder\Filament\Resources\Pages\Concerns\SitePartsDraft;
 use SiteBuilder\Filament\Resources\Pages\Concerns\TreesDraft;
@@ -74,6 +79,9 @@ final class PageEditor extends ResourcePage
     use DesignsDraft;
     use DiscoversDraft;
     use HistoriesDraft;
+    use OpensEditorFindings;
+    use ReviewsAccessibility;
+    use ReviewsPublication;
     use SelectsGalleryMedia;
     use SitePartsDraft;
     use TreesDraft;
@@ -115,6 +123,9 @@ final class PageEditor extends ResourcePage
     public string $locale = '';
 
     #[Locked]
+    public string $initialPanel = 'sections';
+
+    #[Locked]
     public ?string $selectedId = null;
 
     #[Locked]
@@ -151,6 +162,9 @@ final class PageEditor extends ResourcePage
 
     public array $settingsData = [];
 
+    #[Locked]
+    public ?array $incomingLinks = null;
+
     public bool $deleteConfirmed = false;
 
     public function mount(int|string $record): void
@@ -161,8 +175,10 @@ final class PageEditor extends ResourcePage
         $this->tabId = (string) Str::uuid();
         $this->leaseToken = (string) Str::uuid();
         $this->channel = (string) Str::uuid();
-        $this->locale = app(LocaleCatalog::class)->default();
+        $query = request()->query();
+        $this->locale = $this->linkedLocale($query);
         $this->loadPage($page);
+        $this->openLinkedField($query);
         if (Gate::forUser($this->actor())->allows('update', $page) && $this->documentJson !== '') {
             try {
                 app(PageLocks::class)->acquire($this->actor(), $this->pageId, $this->leaseToken);
@@ -193,6 +209,22 @@ final class PageEditor extends ResourcePage
             ->statePath('formData')->disabled(fn (): bool => $this->readOnly)->columns(1);
     }
 
+    private function openLinkedField(array $query): void
+    {
+        $panel = $query['panel'] ?? null;
+        if (! in_array($panel, ['sections', 'settings', 'site-parts'], true)) {
+            return;
+        }
+        $this->initialPanel = $panel;
+        $field = $query['field'] ?? null;
+        if ($panel === 'settings' && in_array($field, ['slug', 'meta_title', 'meta_description', 'og_image', 'noindex', 'canonical'], true)) {
+            $this->initialField = 'settingsData.'.$field;
+        }
+        if ($panel === 'sections') {
+            $this->selectLinkedSection($query);
+        }
+    }
+
     #[Unexposed]
     public function settingsForm(Schema $schema): Schema
     {
@@ -206,7 +238,17 @@ final class PageEditor extends ResourcePage
             TextInput::make('meta_title')->label('Search title'),
             Textarea::make('meta_description')->label('Search description'),
             TextInput::make('canonical')->label('Canonical URL'),
-            TextInput::make('og_image')->label('Social image path'),
+            TextInput::make('og_image')->label('Social image')->helperText('Use the image reference supplied by your media library or host.'),
+            Select::make('social_image_choice')->label('Choose a social image from the media library')
+                ->options(fn (): array => app(OptionalComponents::class)->picker()?->options($this->locale) ?? [])
+                ->visible(fn (): bool => app(OptionalComponents::class)->picker() !== null)
+                ->searchable()->live()->dehydrated(false)
+                ->afterStateUpdated(function (?string $state): void {
+                    if ($state !== null && $state !== '') {
+                        $this->settingsData['og_image'] = $state;
+                    }
+                    $this->settingsData['social_image_choice'] = null;
+                }),
             Toggle::make('noindex')->label('Exclude this language from indexing'),
             Toggle::make('nofollow')->label('Ask crawlers not to follow links'),
             Textarea::make('schema_json')->label('Structured data (JSON)')->rows(5),
@@ -356,10 +398,20 @@ final class PageEditor extends ResourcePage
         return $this->perform($requestId, function () use ($revisionId): void {
             $this->editable();
             $this->flushSection();
+            $this->flushSettings();
             $this->accept(app(PageCommands::class)->restore($this->actor(), $this->pageId, $this->leaseToken, $this->writeVersion, $revisionId), true);
             $this->selectedId = $this->document()->nodes[0]->id ?? null;
             $this->fillSection();
-            $this->message = 'Restored into the draft. The published page is unchanged.';
+            $this->fillSettings($this->page());
+            $this->message = 'Revision restored to the draft. Review it before publishing.';
+        });
+    }
+
+    public function reviewIncomingLinks(int $requestId = 0): array
+    {
+        return $this->perform($requestId, function (): void {
+            $this->incomingLinks = app(PageIncomingLinks::class)->report($this->actor(), $this->page());
+            $this->deleteConfirmed = false;
         });
     }
 
@@ -367,13 +419,15 @@ final class PageEditor extends ResourcePage
     {
         return $this->perform($requestId, function (): void {
             $this->editable();
-            if (! $this->deleteConfirmed) {
-                throw ValidationException::withMessages(['delete' => 'Review page references and confirm deletion first.']);
+            if ($this->incomingLinks === null || ! $this->deleteConfirmed) {
+                throw ValidationException::withMessages(['delete' => 'Check incoming links and confirm moving this page to Trash.']);
             }
             $this->flushSection();
+            $this->flushSettings();
             app(PageCommands::class)->delete($this->actor(), $this->pageId, $this->leaseToken, $this->writeVersion);
             $this->readOnly = true;
-            $this->redirect(PageResource::getUrl('index'));
+            $this->skipRender();
+            $this->redirect(PageResource::getUrl('trash'));
         });
     }
 
@@ -509,7 +563,7 @@ final class PageEditor extends ResourcePage
         }
         $this->editable();
         $data = $this->settingsForm->getState();
-        $page = $this->page();
+        $page = $this->page()->draftView();
         $metadata = [];
         foreach (['title', 'type', 'layout'] as $key) {
             if (! $this->same($this->settingsBaseline[$key] ?? null, $data[$key] ?? null)) {
@@ -558,7 +612,7 @@ final class PageEditor extends ResourcePage
             throw ValidationException::withMessages($errors);
         }
         $this->settingsBaseline = $this->settingsData;
-        $this->message = 'Page settings saved. These shared settings take effect immediately.';
+        $this->message = 'Settings saved to the draft. Publish when you are ready to make them live.';
         $this->fillDesign();
     }
 
@@ -572,7 +626,7 @@ final class PageEditor extends ResourcePage
         $this->documentJson = app(DocumentCodec::class)->encode($result->page->draft_content ?? new Document);
         $this->draftDigest = $result->draftDigest;
         $this->writeVersion = $result->page->write_version;
-        $this->pageTitle = $result->page->title;
+        $this->pageTitle = $result->page->draftView()->title;
         $this->publicationStatus = $result->page->status;
         $this->message = '';
         if ($historyBoundary) {
@@ -585,7 +639,7 @@ final class PageEditor extends ResourcePage
 
     private function loadPage(Page $page): void
     {
-        $this->pageTitle = $page->title;
+        $this->pageTitle = $page->draftView()->title;
         $this->publicationStatus = $page->status;
         $this->writeVersion = $page->write_version;
         try {
@@ -621,6 +675,7 @@ final class PageEditor extends ResourcePage
 
     private function fillSettings(Page $page): void
     {
+        $page = $page->draftView();
         $this->cacheSchema('settingsForm', $this->settingsForm(Schema::make($this)));
         $this->settingsForm->fill(['title' => $page->title, 'type' => $page->type, 'layout' => $page->layout,
             'slug' => $page->slugs->firstWhere('locale', $this->locale)?->slug,
@@ -635,7 +690,7 @@ final class PageEditor extends ResourcePage
 
     private function refreshPreview(): void
     {
-        if ($this->documentJson !== '' && Gate::forUser($this->actor())->allows('preview', $this->page())) {
+        if ($this->documentJson !== '' && PreviewLinks::epoch() !== '' && Gate::forUser($this->actor())->allows('preview', $this->page())) {
             $this->channel = (string) Str::uuid();
             $this->previewExpiresAt = time() + max(1, (int) config('site-builder.preview.expiry_minutes', 1440)) * 60;
             $this->previewUrl = app(PreviewLinks::class)->create($this->actor(), $this->pageId, $this->locale, $this->tabId, $this->channel);
@@ -777,7 +832,7 @@ final class PageEditor extends ResourcePage
         $selected = $this->selectedNode();
         $diagnostics = $this->documentJson === '' ? [] : app(DocumentValidator::class)->diagnostics($this->document());
 
-        return [...$this->sitePartsViewData(), ...$this->clipboardViewData(), ...$this->compositionViewData(), ...$this->designViewData(), ...$this->treeViewData(), 'componentForms' => $forms->all(), 'locales' => config('site-builder.locales'),
+        return [...$this->publishingViewData($page), ...$this->sitePartsViewData(), ...$this->clipboardViewData(), ...$this->compositionViewData(), ...$this->designViewData(), ...$this->treeViewData(), 'componentForms' => $forms->all(), 'locales' => config('site-builder.locales'),
             'editorAssetVersion' => substr(hash_file('sha256', __DIR__.'/../../../resources/dist/site-builder.js'), 0, 16),
             'hasForm' => $this->selectedFormEditable(),
             'diagnostics' => $diagnostics, 'canPublish' => Gate::forUser($this->actor())->allows('publish', $page),
@@ -785,6 +840,7 @@ final class PageEditor extends ResourcePage
             'canRestore' => Gate::forUser($this->actor())->allows('restore', $page),
             'revisions' => app(PageHistory::class)->revisions($this->actor(), $this->pageId, 20, $this->historyBefore),
             'publicUrl' => $page->status === 'published' ? app(PageUrlResolver::class)->url($page, $this->locale) : null,
+            'searchPreview' => app(Seo::class)->metadata($page->draftView(), $this->locale),
             'releaseUrl' => Filament::getCurrentPanel()->route('site-builder.release', ['page' => $this->pageId]),
             'indexUrl' => PageResource::getUrl('index')];
     }

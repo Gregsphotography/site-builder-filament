@@ -15,6 +15,8 @@ final readonly class OptionalComponents
 
     private const MEDIA = 'SiteBuilder\\Components\\Media\\MediaLibrary';
 
+    private const ALBUMS = 'SiteBuilder\\Components\\Albums\\AlbumLibrary';
+
     public function __construct(private Container $container) {}
 
     public function templateOptions(string $locale): array
@@ -30,6 +32,11 @@ final readonly class OptionalComponents
     public function media(): ?object
     {
         return $this->container->bound(self::MEDIA) ? $this->container->make(self::MEDIA) : null;
+    }
+
+    public function albums(): ?object
+    {
+        return class_exists(self::ALBUMS) ? $this->container->make(self::ALBUMS) : null;
     }
 
     public function picker(): ?MediaPicker

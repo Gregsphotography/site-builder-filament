@@ -167,3 +167,10 @@
 .sb-hotspot-placement button:focus-visible { outline: 3px solid #8c3c00; outline-offset: 3px; }
 .sb-popup-library { display: grid; gap: 1rem; list-style: none; padding: 0; }
 .sb-popup-library > li { padding: 1rem; border: 1px solid currentColor; border-radius: .5rem; }
+.sb-sharing-preview { display: grid; gap: .6rem; margin-block: 1.2rem; }
+.sb-sharing-preview strong { display: block; font-weight: 650; }
+.sb-snippet, .sb-share-card { border: 1px solid #9eafa7; border-radius: .65rem; overflow: hidden; overflow-wrap: anywhere; }
+.sb-snippet, .sb-share-card > div { padding: .8rem; }
+.sb-snippet strong { color: #234b9d; font-size: 1.05rem; }
+.dark .sb-snippet strong { color: #a4c6ff; }
+.sb-share-card img { display: block; width: 100%; aspect-ratio: 1.91; object-fit: cover; }

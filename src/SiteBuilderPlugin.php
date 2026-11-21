@@ -7,12 +7,14 @@ namespace SiteBuilder\Filament;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Illuminate\Support\Facades\Route;
+use SiteBuilder\Components\Albums\Album;
 use SiteBuilder\Filament\Http\PickerPreview;
 use SiteBuilder\Filament\Http\ReleaseLease;
 use SiteBuilder\Filament\Http\ReleaseSitePartLease;
 use SiteBuilder\Filament\Http\SitePartPreview;
 use SiteBuilder\Filament\Pages\ComponentLibrary;
 use SiteBuilder\Filament\Pages\MediaLibrary;
+use SiteBuilder\Filament\Resources\Albums\AlbumResource;
 use SiteBuilder\Filament\Resources\Pages\PageResource;
 use SiteBuilder\Filament\Resources\SiteParts\SitePartResource;
 
@@ -52,7 +54,9 @@ final class SiteBuilderPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
-        $panel->resources([PageResource::class, SitePartResource::class])->pages([ComponentLibrary::class, Pages\PopupLibrary::class, ...($this->withMediaLibrary ? [MediaLibrary::class] : []), ...($this->withForms ? [Pages\FormProfiles::class, Pages\FormInbox::class] : []), ...$this->additionalPages]);
+        $panel->resources([PageResource::class, SitePartResource::class, ...($this->withMediaLibrary && class_exists(Album::class) ? [AlbumResource::class] : [])])
+            ->pages([ComponentLibrary::class, Pages\PopupLibrary::class, ...($this->withMediaLibrary ? [MediaLibrary::class] : []), ...($this->withForms ? [Pages\FormProfiles::class, Pages\FormInbox::class] : []), ...$this->additionalPages]);
+        $panel->pages([Pages\SeoOverview::class, Pages\RedirectManager::class]);
         $panel->authenticatedRoutes(function (): void {
             Route::get('/site-builder/site-parts/{part}/preview', SitePartPreview::class)->middleware('signed')->name('site-builder.part-preview');
             Route::post('/site-builder/site-parts/{part}/release', ReleaseSitePartLease::class)->name('site-builder.part-release');

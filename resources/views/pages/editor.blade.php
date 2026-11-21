@@ -3,7 +3,7 @@
     data-editor-identity="{{ $this->pageId }}-{{ $this->tabId }}"
     x-load
     x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('siteBuilderEditor', package: 'gregsphotography/site-builder-filament') }}&amp;content={{ $editorAssetVersion }}"
-    x-data="siteBuilderEditor(@js(['pageId' => $this->pageId, 'session' => $this->tabId, 'releaseUrl' => $releaseUrl, 'csrf' => csrf_token(), 'heartbeat' => max(5, (int) config('site-builder.locks.heartbeat_seconds', 30))]))"
+    x-data="siteBuilderEditor(@js(['pageId' => $this->pageId, 'session' => $this->tabId, 'panel' => $this->initialPanel, 'field' => $this->initialField, 'releaseUrl' => $releaseUrl, 'csrf' => csrf_token(), 'heartbeat' => max(5, (int) config('site-builder.locks.heartbeat_seconds', 30))]))"
     @focusout="typingBoundary = true"
     wire:key="editor-{{ $this->pageId }}-{{ $this->tabId }}"
 >
@@ -16,16 +16,16 @@
                 @foreach ($locales as $code => $configuration)<option value="{{ $code }}">{{ $configuration['label'] ?? $code }}</option>@endforeach
             </select>
         </label>
-        <span class="sb-save-state" role="status" aria-live="polite" x-text="busy ? 'Saving…' : (queue.blocked ? 'Save unconfirmed' : (dirty ? 'Unsaved changes' : (pendingThemeChoice() ? 'Theme review pending' : ($wire.readOnly ? 'Read only' : 'Draft saved'))))"></span>
+        <span class="sb-save-state" role="status" aria-live="polite" x-text="busy ? 'Saving…' : (queue.blocked ? 'Save unconfirmed' : ((dirty || pendingSettings()) ? 'Unsaved changes' : (pendingThemeChoice() ? 'Theme review pending' : ($wire.readOnly ? 'Read only' : 'Draft saved'))))"></span>
         <div class="sb-draft-history" role="group" aria-label="Document undo and redo">
             <button type="button" @click="run('undoDraft')" :disabled="busy || $wire.readOnly || queue.blocked || !historyState.canUndo" :aria-label="'Undo ' + (historyState.undoLabel || 'document change')">Undo<span x-show="historyState.undoCount" x-text="' (' + historyState.undoCount + ')' "></span></button>
             <button type="button" @click="run('redoDraft')" :disabled="busy || $wire.readOnly || queue.blocked || !historyState.canRedo" :aria-label="'Redo ' + (historyState.redoLabel || 'document change')">Redo<span x-show="historyState.redoCount" x-text="' (' + historyState.redoCount + ')' "></span></button>
         </div>
-        <button type="button" @click="run('saveSelected')" :disabled="busy || $wire.readOnly || queue.blocked">Save draft</button>
+        <button type="button" @click="run('saveSettings')" :disabled="busy || $wire.readOnly || queue.blocked">Save draft</button>
         @if ($canPublish)<button class="sb-primary" type="button" @click="run('publish')" :disabled="busy || $wire.readOnly || queue.blocked">Publish</button>@endif
         @if ($publicUrl)<a class="sb-public" href="{{ $publicUrl }}" target="_blank" rel="noopener">View live ↗</a>@endif
     </header>
-    <div class="sb-status" role="status" aria-live="polite" :inert="($wire.pickerOpen && !pickerDismissed) || ($wire.clipboardOpen && !clipboardDismissed)" x-show="$wire.message && !error && !$wire.readOnly && !queue.blocked && $wire.state === 'saved' && !dirty && !pendingThemeChoice()" x-cloak x-text="$wire.message"></div>
+    <div class="sb-status" role="status" aria-live="polite" :inert="($wire.pickerOpen && !pickerDismissed) || ($wire.clipboardOpen && !clipboardDismissed)" x-show="$wire.message && !error && !$wire.readOnly && !queue.blocked && $wire.state === 'saved' && !dirty && !pendingSettings() && !pendingThemeChoice()" x-cloak x-text="$wire.message"></div>
     <div class="sb-notice" :inert="($wire.pickerOpen && !pickerDismissed) || ($wire.clipboardOpen && !clipboardDismissed)" x-show="error || $wire.readOnly || queue.blocked || ['invalid', 'failed', 'conflict'].includes($wire.state)" x-cloak>
         <p role="alert" x-text="error || $wire.message || 'This page is read only.'">{{ $message }}</p>
         <button type="button" @click="download()">Download unsaved changes</button>
@@ -40,9 +40,11 @@
         <aside class="sb-sidebar" aria-label="Page editing controls">
             <nav class="sb-tabs" aria-label="Editor panels">
                 <button type="button" @click="panel = 'sections'" :aria-pressed="panel === 'sections'">Sections</button>
+                <button type="button" @click="panel = 'accessibility'" :aria-pressed="panel === 'accessibility'">Accessibility</button>
                 <button type="button" @click="panel = 'design'" :aria-pressed="panel === 'design'">Design</button>
                 <button type="button" @click="panel = 'settings'" :aria-pressed="panel === 'settings'">Page settings</button>
                 <button type="button" @click="panel = 'site-parts'" :aria-pressed="panel === 'site-parts'">Site parts</button>
+                @if ($clientReviewsAvailable)<button type="button" @click="panel = 'reviews'" :aria-pressed="panel === 'reviews'">Client review</button>@endif
                 <button type="button" @click="panel = 'history'" :aria-pressed="panel === 'history'">History</button>
             </nav>
             <div class="sb-panel" x-show="panel === 'sections'">
@@ -93,25 +95,53 @@
                     <details class="sb-diagnostics"><summary>{{ count($diagnostics) }} content diagnostic(s)</summary><ul>@foreach ($diagnostics as $diagnostic)<li>{{ $diagnostic->message }} <small>{{ $diagnostic->path }}</small></li>@endforeach</ul></details>
                 @endif
             </div>
+            @include('site-builder-filament::pages.accessibility-review')
             @include('site-builder-filament::pages.design')
             @include('site-builder-filament::pages.site-parts')
             <div class="sb-panel" x-show="panel === 'settings'" x-cloak>
                 <h2>Page settings</h2>
-                <p class="sb-help">Saving title, URLs, layout and search settings changes the live page immediately. Section drafts remain private until published.</p>
+                <p class="sb-help">Publish to apply the draft title, URLs, layout and search settings along with your content.</p>
                 <form @submit.prevent="run('saveSettings')"><fieldset :disabled="$wire.readOnly || queue.blocked">{{ $this->settingsForm }}</fieldset><button class="sb-primary" type="submit" :disabled="busy || $wire.readOnly || queue.blocked">Save page settings</button></form>
+                @include('site-builder-filament::pages.search-preview')
                 <h3>Content discovery · {{ strtoupper($this->locale) }}</h3><p class="sb-help">These fields stay in the draft until you publish the page.</p>
                 <form @submit.prevent="run('saveDiscoverySettings')"><fieldset :disabled="$wire.readOnly || queue.blocked">{{ $this->discoveryForm }}</fieldset><button class="sb-primary" type="submit" :disabled="busy || $wire.readOnly || queue.blocked">Save discovery draft</button></form>
                 @if ($canPublish && $this->publicationStatus === 'published')<button type="button" @click="run('unpublish')" :disabled="busy || $wire.readOnly || queue.blocked">Unpublish page</button>@endif
                 @if ($canDelete)
-                    <details class="sb-delete"><summary>Delete this page</summary><p>Review links and references to this page first. Deletion removes the page, URLs and content history.</p>
-                        <label><input type="checkbox" wire:model="deleteConfirmed"> I have reviewed references and want to delete this page.</label>
-                        <button type="button" @click="run('deletePage')" :disabled="busy || $wire.readOnly || queue.blocked || !$wire.deleteConfirmed">Delete page</button>
+                    <details class="sb-delete" wire:ignore.self><summary>Move page to Trash</summary>
+                        <p>Pages in Trash are offline. Their URLs stay reserved and their revisions can be recovered. Restoring a page returns it to draft.</p>
+                        <button type="button" @click="run('reviewIncomingLinks')" :disabled="busy || queue.blocked">Check incoming links</button>
+                        @if ($incomingLinks !== null)
+                            <p>Checked registered fields in builder pages and site parts you can view, and links in stored menus. Custom host content may have other links.</p>
+                            @if ($incomingLinks === [])
+                                <p>No incoming links found in the checked content.</p>
+                            @else
+                                <ul>
+                                    @foreach ($incomingLinks as $link)
+                                        <li>
+                                            {{ $link['type'] }} ·
+                                            @if ($link['type'] === 'Page')
+                                                <a href="{{ \SiteBuilder\Filament\Resources\Pages\PageResource::getUrl('edit', ['record' => $link['id']]) }}" target="_blank" rel="noopener">{{ $link['name'] }}</a>
+                                            @elseif ($link['type'] === 'Site part')
+                                                <a href="{{ \SiteBuilder\Filament\Resources\SiteParts\SitePartResource::getUrl('edit', ['record' => $link['id']]) }}" target="_blank" rel="noopener">{{ $link['name'] }}</a>
+                                            @else
+                                                {{ $link['name'] }}
+                                            @endif
+                                            ({{ $link['scope'] }})
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                            <label><input type="checkbox" wire:model.live="deleteConfirmed"> Move this page to Trash</label>
+                            <button type="button" @click="run('deletePage')" :disabled="busy || $wire.readOnly || queue.blocked || !$wire.deleteConfirmed">Move to Trash</button>
+                        @endif
                     </details>
                 @endif
             </div>
+            @if ($clientReviewsAvailable) @include('site-builder-filament::publishing.editor-reviews') @endif
             <div class="sb-panel" x-show="panel === 'history'" x-cloak>
-                <h2>Published history</h2><p class="sb-help">Restore sections into the draft. The live page and current page settings stay unchanged.</p>
+                <h2>Published history</h2><p class="sb-help">Restore a revision into the draft, review it, then publish.</p>
                 <ol class="sb-history">@forelse ($revisions as $revision)<li><strong>{{ $revision->label ?: 'Published revision #'.$revision->id }}</strong><span>{{ $revision->created_at?->format('Y-m-d H:i') ?? 'Historical time unavailable' }}</span>
+                    <span>{{ $revision->settings_snapshot === null ? 'Content only' : 'Content, URLs and page settings' }}</span>
                     @if ($canRestore)<button type="button" @click="run('restoreRevision', {{ $revision->id }})" :disabled="busy || $wire.readOnly || queue.blocked">Restore to draft</button>@endif
                 </li>@empty<li>No published revisions yet.</li>@endforelse</ol>
                 @if(count($revisions) === 20)<button type="button" @click="run('historyPage', {{ $revisions->last()->id }})" :disabled="busy || queue.blocked">Older revisions</button>@endif

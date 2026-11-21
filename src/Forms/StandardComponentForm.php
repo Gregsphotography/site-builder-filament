@@ -28,6 +28,7 @@ use SiteBuilder\Core\SiteParts\SitePartCatalog;
 use SiteBuilder\Core\SiteParts\SitePartRevision;
 use SiteBuilder\Filament\Contracts\ComponentForm;
 use SiteBuilder\Filament\Contracts\TypedMediaPicker;
+use SiteBuilder\Filament\Support\OptionalComponents;
 use SiteBuilder\Filament\Support\OptionalForms;
 
 /** Optional forms follow the installed core schema; no component-pack dependency. */
@@ -44,7 +45,7 @@ final readonly class StandardComponentForm implements ComponentForm
         'hero' => 'Hero', 'text' => 'Text', 'image' => 'Image', 'image-text' => 'Image and text',
         'cards' => 'Cards and logos', 'cta' => 'Call to action', 'faq' => 'Questions and answers',
         'contact-details' => 'Contact details', 'section' => 'Section', 'container' => 'Container',
-        'brand' => 'Site branding', 'navigation' => 'Navigation', 'gallery' => 'Image gallery', 'testimonials' => 'Testimonials',
+        'brand' => 'Site branding', 'navigation' => 'Navigation', 'gallery' => 'Image gallery', 'album' => 'Photo album', 'testimonials' => 'Testimonials',
         'columns' => 'Columns', 'column' => 'Column',
     ];
 
@@ -78,6 +79,17 @@ final readonly class StandardComponentForm implements ComponentForm
 
     public function schema(EditorContext $context): array
     {
+        if ($this->type() === 'standard.album') {
+            $albums = app(OptionalComponents::class)->albums();
+
+            return [Select::make('album')->label('Published album')->searchable()->preload()
+                ->options(fn (): array => $albums?->publishedOptions() ?? [])
+                ->getSearchResultsUsing(fn (string $search): array => $albums?->publishedOptions($search) ?? [])
+                ->getOptionLabelUsing(fn (string $value): ?string => $albums?->publishedById($value)['title'] ?? null)
+                ->disabled($context->readOnly || ! $albums?->available())
+                ->helperText('Publish an album in Albums to select it here. When you republish the album, this page updates too.')];
+        }
+
         return $this->fields($this->definition->properties(), $context, [
             'media' => $this->references($this->definition->properties(), $context->originalValues, 'media'),
             'page' => $this->references($this->definition->properties(), $context->originalValues, 'page'),

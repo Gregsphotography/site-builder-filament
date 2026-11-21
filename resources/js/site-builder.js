@@ -3,12 +3,27 @@ import { copyStructuredText, readStructuredText, handlesDocumentHistory, newTypi
 import { captureEditorFocus, focusAcceptedSection, focusEditorControl, resolveEditorRoot } from './focus.js';
 import { validMessage, previewMessage } from '#site-builder-core-protocol';
 
+function focusFormControl(root, document, field, options = {}) {
+  const binding = CSS.escape(field);
+  const id = CSS.escape(field.replace(/^formData\./, 'sectionForm.').replace(/^settingsData\./, 'settingsForm.'));
+  return focusEditorControl(root, document, [
+    '#' + id + ' [contenteditable="true"]', '#' + id + ':is(input,textarea,select,button):not(:disabled)',
+    '[wire\\:model="' + binding + '"]:not(:disabled)', '[id="' + binding + '"]:not(:disabled)',
+    '[id$=".' + binding + '"]:not(:disabled)', '[id$=".' + binding + '-0"]:not(:disabled)',
+    '#' + id + ' button:not(:disabled)', '[wire\\:model^="' + binding + '."]:not(:disabled)',
+    '.sb-section-select[aria-pressed="true"]',
+  ], options);
+}
+
 export default function siteBuilderEditor(config) {
   return {
-    panel: 'sections', viewport: 'desktop', busy: false, saving: false, dirty: false, error: '', timer: null, confirmReload: false,
+    panel: config.panel || 'sections', viewport: 'desktop', busy: false, saving: false, dirty: false, error: '', timer: null, confirmReload: false,
     pickerSearch: '', pickerCategory: '', pickerKind: 'component', pickerDismissed: false, pickerOpener: null, draggedNode: null, clipboardOpener: null, clipboardDismissed: false, clipboardMessage: '', clipboardCheckedText: '', showCapture: false, announcement: '', focusEpoch: 0, editorElement: null, typingGroup: newTypingGroup(), typingBoundary: false, historyState: { available: false, canUndo: false, canRedo: false, undoCount: 0, redoCount: 0 },
     init() {
       this.editorElement = this.$root || this.$el;
+      if (config.field) {
+        this.$nextTick(() => focusFormControl(this.editorElement, document, config.field));
+      }
       this.historyState = { ...(this.$wire.draftHistoryState || this.historyState) };
       this.queue = new WriteQueue((action, ...args) => this.$wire.$call(action, ...args), this.$wire.writeVersion);
       this.stopInterceptor = this.$wire.$interceptMessage(({ onFailure, onError, onSuccess }) => {
@@ -45,7 +60,7 @@ export default function siteBuilderEditor(config) {
         navigator.sendBeacon(config.releaseUrl, body);
       };
       this.unloadListener = event => {
-        if (this.dirty || this.clipboardInputPending() || this.pendingThemeChoice() || stableState(this.$wire.settingsData) !== stableState(this.$wire.settingsBaseline) || this.queue.blocked) { event.preventDefault(); event.returnValue = ''; }
+        if (this.dirty || this.clipboardInputPending() || this.pendingThemeChoice() || this.pendingSettings() || this.queue.blocked) { event.preventDefault(); event.returnValue = ''; }
       };
       this.resumeListener = event => { if (event.persisted) { this.queue.blocked = true; this.error = 'Reload saved content to request a fresh editing lease.'; } };
       window.addEventListener('pagehide', this.leaveListener);
@@ -66,6 +81,10 @@ export default function siteBuilderEditor(config) {
     },
     pendingThemeChoice() {
       return (this.$wire.designThemeChoice || null) !== (this.$wire.designThemeBaseline || null);
+    },
+    pendingSettings() {
+      return stableState(this.$wire.settingsData) !== stableState(this.$wire.settingsBaseline)
+        || stableState(this.$wire.discoveryData) !== stableState(this.$wire.discoveryBaseline);
     },
     referenceChoicesReviewed() {
       return stableState(this.$wire.pickerReferenceValues || {}) === stableState(this.$wire.pickerReferenceBaseline || {});
@@ -236,6 +255,12 @@ export default function siteBuilderEditor(config) {
           if (['reviewRevisionImpact', 'applyStage', 'cancelStage'].includes(action)) acceptedFocus = () => focusEditorControl(editorRoot, browserDocument, '[data-part-impact]', { isCurrent: () => focusEpoch === this.focusEpoch, allowFrom: initiatingControl });
           if (action === 'prepareStage') acceptedFocus = () => focusEditorControl(editorRoot, browserDocument, '[data-part-stage-review]', { isCurrent: () => focusEpoch === this.focusEpoch, allowFrom: initiatingControl });
           if (action === 'selectSitePartBinding') { this.panel = 'site-parts'; acceptedFocus = () => focusEditorControl(editorRoot, browserDocument, '[data-site-parts-heading]', { isCurrent: () => focusEpoch === this.focusEpoch, allowFrom: initiatingControl }); }
+          if (response.accessibilityField) {
+            this.panel = 'sections';
+            acceptedFocus = () => focusFormControl(editorRoot, browserDocument, 'formData.' + response.accessibilityField, {
+              isCurrent: () => focusEpoch === this.focusEpoch, allowFrom: initiatingControl,
+            });
+          }
           if (action === 'captureSavedSection') this.showCapture = false;
         }
         this.highlight();

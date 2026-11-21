@@ -27,6 +27,7 @@ final readonly class ComponentExamples
         }
 
         $exampleType = match ($type) {
+            'standard.album' => 'standard.gallery',
             'standard.column' => 'standard.columns',
             'standard.tab-panel' => 'standard.tabs',
             'standard.accordion-item' => 'standard.accordion',
@@ -80,6 +81,7 @@ final readonly class ComponentExamples
         }
 
         $note = match (true) {
+            $type === 'standard.album' => 'An album uses this gallery layout with the photos from its latest publication.',
             $type === 'standard.column' => 'A column is shown here within a columns layout.',
             $type === 'standard.tab-panel' => 'A tab panel is shown here within a tabs layout.',
             $type === 'standard.accordion-item' => 'An accordion item is shown here within an accordion.',

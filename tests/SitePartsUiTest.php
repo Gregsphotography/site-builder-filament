@@ -179,7 +179,7 @@ class SitePartsUiTest extends EditorUiTestCase
         foreach ($pages as $page) {
             $this->assertSame(0, $page->editLock()->count());
         }
-        $this->assertSame('Accepted competing title', $pages[1]->fresh()->title);
+        $this->assertSame('Accepted competing title', $pages[1]->fresh()->draftView()->title);
     }
 
     public function test_unknown_site_part_payload_is_read_only_and_keeps_the_original_recovery_bytes(): void

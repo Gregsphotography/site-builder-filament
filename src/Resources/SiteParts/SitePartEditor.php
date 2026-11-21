@@ -59,6 +59,7 @@ use SiteBuilder\Filament\Forms\EditorContext;
 use SiteBuilder\Filament\Forms\NodeFormState;
 use SiteBuilder\Filament\Forms\TreePresentation;
 use SiteBuilder\Filament\Resources\Pages\Concerns\CopiesSnapshots;
+use SiteBuilder\Filament\Resources\Pages\Concerns\OpensEditorFindings;
 use SiteBuilder\Filament\Resources\Pages\Concerns\SelectsGalleryMedia;
 use SiteBuilder\Filament\Resources\SiteParts\Concerns\SitePartDesigns;
 use SiteBuilder\Filament\Resources\SiteParts\Concerns\SitePartRollouts;
@@ -68,6 +69,7 @@ use Throwable;
 final class SitePartEditor extends ResourcePage
 {
     use CopiesSnapshots;
+    use OpensEditorFindings;
     use SelectsGalleryMedia;
     use SitePartDesigns;
     use SitePartRollouts;
@@ -180,8 +182,10 @@ final class SitePartEditor extends ResourcePage
         $this->partId = $part->id;
         $this->tabId = (string) Str::uuid();
         $this->leaseToken = (string) Str::uuid();
-        $this->locale = app(LocaleCatalog::class)->default();
+        $query = request()->query();
+        $this->locale = $this->linkedLocale($query);
         $this->loadPart($part);
+        $this->selectLinkedSection($query);
         if (! $this->unsupportedPayload && Gate::forUser($this->actor())->allows('update', $part) && $part->archived_at === null) {
             try {
                 app(SitePartLocks::class)->acquire($this->actor(), $this->partId, $this->leaseToken);
@@ -193,6 +197,10 @@ final class SitePartEditor extends ResourcePage
         }
         $this->openHistory();
         $this->fillSection();
+        $path = $query['fieldPath'] ?? null;
+        if (is_array($path) && array_is_list($path) && count($path) <= 32 && is_string($path[0] ?? null) && $this->initialField === 'formData.'.$path[0]) {
+            $this->initialField = 'formData.'.$this->linkedFormPath($path);
+        }
         $this->fillSettings();
         $this->refreshPreview();
     }

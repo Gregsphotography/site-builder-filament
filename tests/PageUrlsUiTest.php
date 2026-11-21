@@ -47,10 +47,12 @@ class PageUrlsUiTest extends EditorUiTestCase
         $this->assertSame(0, $page->fresh()->write_version);
         $editor->set('settingsData.title', 'Retained title');
         $editor->set('settingsData.slug', '0')->call('saveSettings')->assertHasNoErrors()->assertSet('state', 'saved')->assertSet('readOnly', false);
-        $this->assertSame('0', $page->slugs()->sole()->slug);
-        $this->assertSame('Retained title', $page->fresh()->title);
+        $this->assertSame('original', $page->slugs()->sole()->slug);
+        $this->assertSame('0', $page->fresh()->draftView()->slugs->sole()->slug);
+        $this->assertSame('Retained title', $page->fresh()->draftView()->title);
         $editor->set('settingsData.slug', '')->call('saveSettings')->assertHasNoErrors()->assertSet('state', 'saved');
-        $this->assertSame(0, $page->slugs()->count());
+        $this->assertCount(0, $page->fresh()->draftView()->slugs);
+        $this->assertSame('original', $page->slugs()->sole()->slug);
     }
 
     public function test_read_only_history_explains_access_even_when_the_store_is_installed(): void

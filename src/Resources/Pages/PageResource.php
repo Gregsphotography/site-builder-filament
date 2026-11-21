@@ -42,6 +42,6 @@ final class PageResource extends Resource
 
     public static function getPages(): array
     {
-        return ['index' => ListPages::route('/'), 'create' => CreatePage::route('/create'), 'edit' => PageEditor::route('/{record}/edit')];
+        return ['index' => ListPages::route('/'), 'create' => CreatePage::route('/create'), 'trash' => TrashPages::route('/trash'), 'edit' => PageEditor::route('/{record}/edit')];
     }
 }

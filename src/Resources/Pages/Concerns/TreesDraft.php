@@ -149,6 +149,6 @@ trait TreesDraft
             return ['sectionTree' => [], 'sections' => [], 'treeContainers' => []];
         }
 
-        return app(TreePresentation::class)->describe($this->document(), new RenderContext($this->locale, 'preview', $this->pageId, $this->page()->layout), $this->selectedId, $this->treeMoveParentId);
+        return app(TreePresentation::class)->describe($this->document(), new RenderContext($this->locale, 'preview', $this->pageId, $this->page()->draftLayout()), $this->selectedId, $this->treeMoveParentId);
     }
 }

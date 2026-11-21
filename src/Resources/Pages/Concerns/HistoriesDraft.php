@@ -84,7 +84,7 @@ trait HistoriesDraft
             $this->clipboardOpen = false;
             $this->clearClipboardReview();
             $this->responseExtras = ['focusNodeId' => $this->selectedId, 'focusEmptyAdd' => $this->selectedId === null, 'announcement' => $redo ? 'Draft change redone.' : 'Draft change undone.'];
-            $this->message = ($redo ? 'Redid' : 'Undid').' the last document change. The live page and shared page settings are unchanged.';
+            $this->message = ($redo ? 'Redid' : 'Undid').' the last content change in this draft.';
         });
     }
 

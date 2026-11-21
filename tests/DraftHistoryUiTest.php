@@ -106,7 +106,7 @@ class DraftHistoryUiTest extends DatabaseTestCase
         $this->assertSame('Works without stores', $page->fresh()->draft_content->nodes[0]->translations->get('en')->heading);
     }
 
-    public function test_acknowledged_typing_groups_branch_and_shared_metadata_survive_undo(): void
+    public function test_acknowledged_typing_groups_branch_and_staged_metadata_survive_undo(): void
     {
         $this->installHistory();
         $page = $this->page();
@@ -117,12 +117,12 @@ class DraftHistoryUiTest extends DatabaseTestCase
             ->call('saveSelected')->set('formData.heading', 'New typing group')->call('autosaveSelected', $group)->assertSet('draftHistoryState.undoCount', 2)
             ->call('undoDraft', 57)->assertReturned(fn (array $ack): bool => $ack['ok'] && $ack['requestId'] === 57 && $ack['version'] === 4)
             ->assertSet('formData.heading', 'Second typing')->assertSet('draftHistoryState.redoCount', 1)
-            ->set('settingsData.title', 'Immediate shared title')->call('saveSettings')->assertSet('draftHistoryState.undoCount', 1)->assertSet('draftHistoryState.redoCount', 1)
+            ->set('settingsData.title', 'Staged title')->call('saveSettings')->assertSet('draftHistoryState.undoCount', 1)->assertSet('draftHistoryState.redoCount', 1)
             ->call('redoDraft')->assertSet('formData.heading', 'New typing group');
-        $this->assertSame('Immediate shared title', $page->fresh()->title);
+        $this->assertSame('Staged title', $page->fresh()->draftView()->title);
         $editor->call('undoDraft')->call('hideSection', 'known', true)->assertSet('draftHistoryState.redoCount', 0)->assertSet('draftHistoryState.undoCount', 2)
             ->call('undoDraft')->call('undoDraft')->assertSet('formData.heading', 'Original')->assertSet('draftHistoryState.undoCount', 0);
-        $this->assertSame('Immediate shared title', $page->fresh()->title);
+        $this->assertSame('Staged title', $page->fresh()->draftView()->title);
         $this->assertSame('Deutsch', $page->fresh()->draft_content->nodes[0]->translations->get('de')->heading);
         $this->assertNull($page->fresh()->published_content);
     }
@@ -139,7 +139,7 @@ class DraftHistoryUiTest extends DatabaseTestCase
         $digest = app(CanonicalJson::class)->digest($page->fresh()->draft_content);
         $editor->set('formData.heading', 'Retained after conflict')->call('undoDraft')->assertSet('state', 'conflict')->assertSet('formData.heading', 'Retained after conflict');
         $this->assertSame($digest, app(CanonicalJson::class)->digest($page->fresh()->draft_content));
-        $this->assertSame('External title', $page->fresh()->title);
+        $this->assertSame('External title', $page->fresh()->draftView()->title);
     }
 
     public function test_removed_unknown_subtree_is_restored_exactly_and_publication_reload_restore_are_boundaries(): void

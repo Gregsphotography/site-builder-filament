@@ -89,6 +89,7 @@
         @case('standard.anchor')
             <path d="M70 50 61 59a13 13 0 0 1-18-18l14-14a13 13 0 0 1 18 0M90 46l9-9a13 13 0 1 1 18 18l-14 14a13 13 0 0 1-18 0M63 56l34-34" />
             @break
+        @case('standard.album')
         @case('standard.gallery')
             <path d="M18 18h39m-39 6h23" class="sb-illustration-muted" />
             <rect x="18" y="34" width="37" height="36" rx="3" />
